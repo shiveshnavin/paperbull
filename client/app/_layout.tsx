@@ -14,6 +14,7 @@ import { Provider } from 'react-redux';
 import { store } from '../components/store';
 import { SqliteTickerApi } from '../services/SqliteTickerApi';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { View } from 'react-native';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -51,7 +52,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded && apiInit) {
       SplashScreen.hideAsync();
-      router.replace('/settings')
+      router.replace('/watchlist')
     }
   }, [loaded, apiInit]);
 
@@ -71,12 +72,18 @@ export default function RootLayout() {
               width: '100%',
               height: '100%',
               backgroundColor: context.theme.colors.background,
-              paddingBottom: context.theme?.insets?.bottom! + 70
+              marginBottom: context.theme?.insets?.bottom!
             }}>
-              <Slot />
-              <AppBottomBar />
+              <View style={{
+                width: '100%',
+                height: '100%',
+                paddingBottom: 100
+              }}>
+                <Slot />
+              </View>
               <EventListeners />
             </SafeAreaView>
+            <AppBottomBar />
           </ThemeContext.Provider>
         </AppContext.Provider>
       </Provider>
