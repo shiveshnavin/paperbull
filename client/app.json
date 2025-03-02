@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PaperBull",
-    "slug": "PaperBull",
+    "slug": "paperbull",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -32,10 +32,20 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "fdd3cd5b-1001-4695-b16d-d91006d55e22"
+      }
+    },
+    "owner": "shiveshnavin"
   }
 }
