@@ -9,6 +9,7 @@ export type Snapshot = {
 
 
 export class TickerApi {
+    snapshotPrev: Snapshot = {} as Snapshot
     snapshot: Snapshot = {} as Snapshot
     symbols: string[] = [];
     currentListenCallback: ((ticks: Tick[]) => void) | null = null;

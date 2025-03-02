@@ -111,9 +111,7 @@ export class SqliteTickerApi extends TickerApi {
             && this.snapshot.ticks?.length > 0) {
             return this.snapshot
         }
-        if (this.symbols.length == 0) {
 
-        }
         const placeholders = this.symbols.map(() => '?').join(',');
         let query = `
             SELECT m.* FROM ${TABLE_NAME} m

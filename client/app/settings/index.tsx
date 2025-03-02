@@ -1,4 +1,4 @@
-import { BottomSheet, ButtonView, Caption, CardView, CompositeTextInputView, HBox, KeyboardAvoidingScrollView, PressableView, ProgressBarView, Spinner, Subtitle, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
+import { BottomSheet, ButtonView, Caption, CardView, CompositeTextInputView, Expand, HBox, KeyboardAvoidingScrollView, PressableView, ProgressBarView, Spinner, Storage, Subtitle, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
 import { useStyle } from "../../components/style";
 import React, { useContext, useEffect, useState } from "react";
 import { Button, FlatList } from "react-native";
@@ -77,7 +77,7 @@ export function MetaData() {
     })
 
     return (
-        <CardView id="metadata">
+        <CardView key="metadata">
             <Subtitle>Dataset Info</Subtitle>
             {
                 loading && (
@@ -90,34 +90,43 @@ export function MetaData() {
                         setShowSelectSymbols(true)
                     }}>
                         <TextView style={{
-                            color: theme.colors.success
-                        }}>Currently selected date {tickerApi.snapshot?.date}</TextView>
+                            color: theme.colors.accent
+                        }}>Currently selected date is {tickerApi.snapshot?.date} with {tickerApi.symbols.length} instruments selected for paper trading.</TextView>
                     </PressableView>
                 )
             }
             <HBox>
-                <TextView>Total {size} data points across {availableSymbols.length} instruments.</TextView>
+                <TextView>You have total {size} data points across {availableSymbols.length} instruments in this dataset.</TextView>
             </HBox>
-            <Caption>
-                Click on any of the below dates to replay that day.
-            </Caption>
-            {
-                availableDates.map(a => {
-                    return (
-                        <PressableView id={`${a}-${ReactUtils.getRandomNumber(0, 111)}`}
-                            onPress={() => {
-                                tickerApi.snapshot = {
-                                    date: a,
-                                    ticks: [],
-                                    time: '0915'
-                                }
-                                setShowSelectSymbols(true)
-                            }}>
-                            <TitleText style={style.link} >{a}</TitleText>
-                        </PressableView>
-                    )
-                })
-            }
+            <Expand
+                initialExpand={true}
+                title="Available Dates"
+                style={{
+                    paddingStart: 0,
+                    marginStart: -4
+                }}>
+                <TextView>
+                    Click on any of the below dates to replay that day.
+                </TextView>
+                {
+                    availableDates.map((a, idx) => {
+                        return (
+                            <PressableView key={`${a}-${idx}`}
+                                onPress={() => {
+                                    tickerApi.snapshot = {
+                                        date: a,
+                                        ticks: [],
+                                        time: '0915'
+                                    }
+                                    Storage.setKeyAsync('snapshot', JSON.stringify(tickerApi.snapshot))
+                                    setShowSelectSymbols(true)
+                                }}>
+                                <TitleText style={style.link} >{a}</TitleText>
+                            </PressableView>
+                        )
+                    })
+                }
+            </Expand>
             <TransparentButton onPress={() => {
                 loadMetaInfo()
             }}>Refresh</TransparentButton>
@@ -134,21 +143,25 @@ export function MetaData() {
                 onDismiss={() => {
                     setShowSelectSymbols(false)
                 }}
-                title="Select symbols" visible={showSelectSymbols}>
-                <SearchBox symbols={availableSymbols} onDone={(ticks) => {
-                    setShowSelectSymbols(false)
-                    tickerApi.symbols = ticks.map(s => s.symbol)
-                    tickerApi.getSnapShot(
-                        tickerApi.snapshot.date,
-                        '0915'
-                    ).then((snap) => {
+                title="Select instruments" visible={showSelectSymbols}>
+                <SearchBox
+                    selectedSymbols={tickerApi.symbols || []}
+                    symbols={availableSymbols.map(m => m.symbol)}
+                    onDone={(symbols) => {
+                        setShowSelectSymbols(false)
+                        tickerApi.symbols = symbols
+                        Storage.setKeyAsync('symbols', JSON.stringify(symbols))
+                        tickerApi.getSnapShot(
+                            tickerApi.snapshot.date,
+                            '0915'
+                        ).then((snap) => {
 
-                    }).catch(e => {
-                        setError(e.message)
-                    }).finally(() => {
-                        setLoading(false)
-                    })
-                }} />
+                        }).catch(e => {
+                            setError(e.message)
+                        }).finally(() => {
+                            setLoading(false)
+                        })
+                    }} />
             </BottomSheet>
         </CardView>
     )
@@ -180,7 +193,7 @@ export function LoadCsv() {
         }
     })
     return (
-        <CardView id="loadcsv">
+        <CardView key="loadcsv">
             <Subtitle>Load CSV</Subtitle>
             <TextView>Select a file containing the market data. Existing data will be unloaded when you load new data.</TextView>
             {
@@ -223,22 +236,30 @@ export function LoadCsv() {
 }
 
 
-export function SearchBox({ symbols, onDone }: { symbols: Tick[], onDone: (syms: Tick[]) => void }) {
+export function SearchBox({ symbols, selectedSymbols, onDone }: { symbols: string[], selectedSymbols: string[], onDone: (syms: string[]) => void }) {
     const [searchText, setSearchText] = useState('');
-    const [selected, setSelected] = useState<Tick[]>([]);
+    const [selected, setSelected] = useState<string[]>([...selectedSymbols]);
     const theme = useContext(ThemeContext)
-
-    // Filter symbols based on search text
-    const filteredSymbols = symbols.filter(symbol =>
-        symbol.symbol.toLowerCase().includes(searchText.toLowerCase())
-    );
-
-    // Handle checkbox toggle
-    const toggleSelection = (symbol: Tick) => {
+    const filteredSymbols = symbols
+        .map(symbol => {
+            const symbolLower = symbol.toLowerCase();
+            const searchParts = searchText.toLowerCase().split(' ');
+            let score = 0;
+            for (const part of searchParts) {
+                if (symbolLower.includes(part)) {
+                    score++;
+                }
+            }
+            return { symbol, score };
+        })
+        .filter(symbol => symbol.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(e => e.symbol);
+    const toggleSelection = (symbol: string) => {
         setSelected(prevSelected => {
-            const isSelected = prevSelected.some(s => s.symbol === symbol.symbol);
+            const isSelected = prevSelected.some(s => s === symbol);
             if (isSelected) {
-                return prevSelected.filter(s => s.symbol !== symbol.symbol);
+                return prevSelected.filter(s => s !== symbol);
             } else {
                 return [...prevSelected, symbol];
             }
@@ -247,45 +268,52 @@ export function SearchBox({ symbols, onDone }: { symbols: Tick[], onDone: (syms:
 
     return (
         <VBox>
-            {/* Search Input */}
             <CompositeTextInputView
                 placeholder="Search symbols..."
                 onChangeText={(text) => setSearchText(text)}
             />
+            <Caption>
+                Since there are a lot of instruments avaialble in the dataset, select only those symbols that you intend to monitor or paper trade to make sure device performace is not degraded.
+            </Caption>
 
-            {/* List of Symbols with Checkboxes */}
             <FlatList
                 showsVerticalScrollIndicator={false}
                 style={{
-                    margin: theme.dimens.space.md,
-                    maxHeight: 200
+                    maxHeight: 250,
+                    marginBottom: theme.dimens.space.md
                 }}
-                data={filteredSymbols}
+                data={searchText ? filteredSymbols : selectedSymbols}
                 renderItem={({ item }) => (
-                    <VBox key={item.symbol}
-
-                    >
-
+                    <VBox key={item}>
                         <PressableView onPress={() => toggleSelection(item)}>
                             <HBox style={{
-                                alignItems: 'center'
+                                alignItems: 'center',
+                                overflow: 'hidden',
+                                width: '100%',
                             }}>
                                 <Checkbox
                                     style={{
-                                        margin: theme.dimens.space.sm
+                                        margin: theme.dimens.space.sm,
                                     }}
-                                    value={selected.some(s => s.symbol === item.symbol)} onValueChange={() => toggleSelection(item)} />
+                                    value={selected.some(s => s === item)}
+                                    onValueChange={() => toggleSelection(item)}
+                                />
                                 <TextView style={{
-                                    flexGrow: 1
-                                }} >{item.symbol}</TextView>
+                                    flexGrow: 1,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    paddingRight: theme.dimens.space.md
+                                }}>
+                                    {item?.split("-")[0]}
+                                </TextView>
                             </HBox>
                         </PressableView>
-
                     </VBox>
                 )}
             />
 
-            <ButtonView onPress={() => onDone(selected)}>
+            <ButtonView
+                onPress={() => onDone(selected)}>
                 Done
             </ButtonView>
         </VBox>

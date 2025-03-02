@@ -4,7 +4,7 @@ import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../components/AppContext';
 import { Snapshot } from '../services/TickerApi';
 
-export default function TabTwoScreen() {
+export default function Watchlist() {
   const theme = useContext(ThemeContext)
   const styles = useStyle(theme)
   const { context } = useContext(AppContext)
@@ -36,13 +36,14 @@ export default function TabTwoScreen() {
       <KeyboardAvoidingScrollView>
         {
           error && (
-            <AlertMessage type='critical' text={error} />
+            //@ts-ignore
+            <AlertMessage id="AlertMessage" type='critical' text={error} />
           )
         }
         {
           tickerApi.snapshot?.ticks?.map(t => {
             return (
-              <TextView id={t.symbol}>
+              <TextView key={t.symbol}>
                 {t.symbol} {t.last_price}
               </TextView>
             )

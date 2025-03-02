@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '../hooks/useColorScheme';
-import { Colors, DarkColors, Theme, ThemeContext } from 'react-native-boxes';
-import AppBottomBar from '../components/tab';
+import { Colors, DarkColors, Storage, Theme, ThemeContext } from 'react-native-boxes';
+import AppBottomBar from '../components/bottombar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppContext, Context } from '../components/AppContext';
 import { EventListeners } from '../components/EventListeners';
@@ -24,11 +24,21 @@ export default function RootLayout() {
     const ctx = new Context()
     const theme = new Theme('appname', colorScheme === 'dark' ? DarkColors : Colors);
     ctx.theme = theme
-    let db = new SqliteTickerApi()
-    db.init().finally(() => {
+    let tickerApi = new SqliteTickerApi()
+    Storage.getKeyAsync('snapshot').then(snapshot => {
+      if (snapshot) {
+        tickerApi.snapshot = JSON.parse(snapshot)
+      }
+    })
+    Storage.getKeyAsync('symbols').then(symbols => {
+      if (symbols) {
+        tickerApi.symbols = JSON.parse(symbols)
+      }
+    })
+    tickerApi.init().finally(() => {
       setApiInit(true)
     })
-    ctx.tickApi = db
+    ctx.tickApi = tickerApi
     return ctx
   })
 
