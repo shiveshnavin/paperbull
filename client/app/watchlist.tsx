@@ -9,27 +9,44 @@ export default function TabTwoScreen() {
   const styles = useStyle(theme)
   const { context } = useContext(AppContext)
   const tickerApi = context.tickApi
-  const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
 
   function fetchSnapShot() {
-    if (snapshot?.date == undefined) {
+    if (tickerApi.snapshot?.date == undefined) {
       setError('Please select a date from settings.')
       return
+    } else {
+      setError(undefined)
+      tickerApi.getSnapShot(tickerApi.snapshot.date, tickerApi.snapshot.time)
     }
   }
 
   useEffect(() => {
     fetchSnapShot()
-  }, [])
+  }, [tickerApi.snapshot.date, tickerApi.snapshot.time])
   return (
     <VPage style={styles.container}>
-      <TransparentCenterToolbar title="Watchlist" />
+      <TransparentCenterToolbar title="Watchlist" options={[{
+        id: 'refresh',
+        icon: 'refresh',
+        onClick: () => {
+          fetchSnapShot()
+        }
+      }]} />
       <KeyboardAvoidingScrollView>
         {
           error && (
             <AlertMessage type='critical' text={error} />
           )
+        }
+        {
+          tickerApi.snapshot?.ticks?.map(t => {
+            return (
+              <TextView id={t.symbol}>
+                {t.symbol} {t.last_price}
+              </TextView>
+            )
+          })
         }
       </KeyboardAvoidingScrollView>
     </VPage>

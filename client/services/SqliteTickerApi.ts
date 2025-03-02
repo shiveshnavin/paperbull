@@ -128,12 +128,14 @@ export class SqliteTickerApi extends TickerApi {
         `;
 
         const result: any = await this.db.getAllAsync(query, this.symbols);
+        console.log(query, this.symbols, result)
         let ticks = result.map(this.mapDbRowToTick);
         let snapshot = {
             date,
             time,
             ticks
         } as Snapshot
+        this.snapshot = snapshot
         return snapshot
     }
 

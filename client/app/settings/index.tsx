@@ -136,6 +136,7 @@ export function MetaData() {
                 }}
                 title="Select symbols" visible={showSelectSymbols}>
                 <SearchBox symbols={availableSymbols} onDone={(ticks) => {
+                    setShowSelectSymbols(false)
                     tickerApi.symbols = ticks.map(s => s.symbol)
                     tickerApi.getSnapShot(
                         tickerApi.snapshot.date,
