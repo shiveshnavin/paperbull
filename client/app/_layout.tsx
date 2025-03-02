@@ -9,6 +9,9 @@ import { Colors, DarkColors, Theme, ThemeContext } from 'react-native-boxes';
 import AppBottomBar from '../components/tab';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppContext, Context } from '../components/AppContext';
+import { EventListeners } from '../components/EventListeners';
+import { Provider } from 'react-redux';
+import { store } from '../components/store';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -39,21 +42,24 @@ export default function RootLayout() {
   }
 
   return (
-    <AppContext.Provider value={{
-      context,
-      setContext
-    }} >
-      <ThemeContext.Provider value={context.theme} >
-        <SafeAreaView style={{
-          width: '100%',
-          height: '100%',
-          backgroundColor: context.theme.colors.background,
-          paddingBottom: context.theme?.insets?.bottom! + 70
-        }}>
-          <Slot />
-          <AppBottomBar />
-        </SafeAreaView>
-      </ThemeContext.Provider>
-    </AppContext.Provider>
+    <Provider store={store}>
+      <AppContext.Provider value={{
+        context,
+        setContext
+      }} >
+        <ThemeContext.Provider value={context.theme} >
+          <SafeAreaView style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: context.theme.colors.background,
+            paddingBottom: context.theme?.insets?.bottom! + 70
+          }}>
+            <Slot />
+            <AppBottomBar />
+            <EventListeners />
+          </SafeAreaView>
+        </ThemeContext.Provider>
+      </AppContext.Provider>
+    </Provider>
   );
 }

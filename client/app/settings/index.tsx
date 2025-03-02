@@ -3,10 +3,13 @@ import { useStyle } from "../../components/style";
 import { useContext } from "react";
 import { Button } from "react-native";
 import { FilePicker } from "../../components/filepicker/FilePicker";
+import { useEventPublisher } from "../../components/store";
+import { Topic } from "../../components/EventListeners";
 
 export default function Settings() {
     const theme = useContext(ThemeContext)
     const styles = useStyle(theme)
+    const publisher = useEventPublisher()
     return (
         <VPage style={styles.container}>
             <TransparentCenterToolbar title="Settings" />
@@ -16,7 +19,7 @@ export default function Settings() {
                     auto={false}
                     text="Select File"
                     onFiles={(files) => {
-                        console.log('Picked files', files)
+                        publisher(Topic.INGEST_CSV, files[0])
                     }}
                 />
             </CardView>
