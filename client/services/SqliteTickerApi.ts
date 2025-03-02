@@ -31,12 +31,13 @@ export class SqliteTickerApi extends TickerApi {
 
     }
 
-    async seekForward(date: string, time: string, processIntermediates = true) {
+    async seekForward(date: string, time: string, processIntermediates = true): Promise<Tick[]> {
         // calls the onTick function with the ticks with timeframe sampling
+        return (await this.getSnapShot(date, time)).ticks
     }
 
-    async seekBack(date: string, time: string) {
-
+    async seekBack(date: string, time: string): Promise<Tick[]> {
+        return (await this.getSnapShot(date, time)).ticks
     }
 
     async clearDb() {
@@ -119,6 +120,7 @@ export class SqliteTickerApi extends TickerApi {
                 SELECT symbol, MAX(datetime) AS max_datetime
                 FROM ${TABLE_NAME}
                 WHERE symbol IN (${placeholders})
+                AND ( date = '${date}' AND time = '${time}')
                 GROUP BY symbol
             ) latest 
             ON m.symbol = latest.symbol 

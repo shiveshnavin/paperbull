@@ -64,12 +64,13 @@ export class TickerApi {
 
     }
 
-    async seekForward(date: string, time: string, processIntermediates = true) {
+    async seekForward(date: string, time: string, processIntermediates = true): Promise<Tick[]> {
         // calls the onTick function with the ticks with timeframe sampling
+        return []
     }
 
-    async seekBack(date: string, time: string) {
-
+    async seekBack(date: string, time: string): Promise<Tick[]> {
+        return []
     }
 
     async getSnapShot(date: string, time: string): Promise<Snapshot> {
