@@ -6,7 +6,6 @@ import * as FileSystem from 'expo-file-system';
 //@ts-ignore
 import base64Decoder from 'react-native-base64';
 import { FilePickerProps, FileTypes, PickedFile } from "./FilePickerProps";
-import * as ImagePicker from 'expo-image-picker';
 import * as RNFS from 'react-native-fs'
 export { PickedFile } from './FilePickerProps'
 import * as RNFA from 'react-native-file-access';
@@ -16,29 +15,11 @@ export function FilePicker(props: FilePickerProps) {
     const theme = useContext(ThemeContext);
     const handleFileSelection = async () => {
         onPickStart && onPickStart()
-        const result =
-            (type?.type == FileTypes.Camera.type || type?.type == FileTypes.Images.type
-                // || type?.type == FileTypes.Videos.type
-            )
-                ?
-                (
-                    type?.type == FileTypes.Camera.type ?
-                        await ImagePicker.launchCameraAsync({
-                            mediaTypes: type?.type == FileTypes.Videos.type ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
-                            quality: 1,
-                        }) :
-                        await ImagePicker.launchImageLibraryAsync({
-                            allowsMultipleSelection: true,
-                            mediaTypes: type?.type == FileTypes.Videos.type ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
-                            quality: 1,
-                        })
-                )
-                :
-                await DocumentPicker.getDocumentAsync({
-                    copyToCacheDirectory: false,
-                    type: type?.mime || FileTypes.Others.mime,
-                    multiple: true
-                });
+        const result = await DocumentPicker.getDocumentAsync({
+            copyToCacheDirectory: false,
+            type: type?.mime || FileTypes.Others.mime,
+            multiple: true
+        });
 
         if (result.assets == null) {
             onFiles([])
@@ -46,7 +27,7 @@ export function FilePicker(props: FilePickerProps) {
         }
 
 
-        const files = await Promise.all(result.assets.map(async (file) => {
+        const files = await Promise.all(result.assets.map(async (file: any) => {
             const reader = {
                 getChunk: async (offset: number, chunkSize: number) => {
                     try {
@@ -87,7 +68,6 @@ export function FilePicker(props: FilePickerProps) {
 
         onFiles(files);
     };
-    const [status, requestPermission] = ImagePicker.useCameraPermissions();
 
     useEffect(() => { handleFileSelection() }, [auto])
 
@@ -127,7 +107,7 @@ export function FilePicker(props: FilePickerProps) {
             underlayColor={theme.colors.background}
             style={[{
                 color: theme.colors.text
-            }, style]}
+            }, style as any]}
             onPress={handleFileSelection}
             text={text}
         />
