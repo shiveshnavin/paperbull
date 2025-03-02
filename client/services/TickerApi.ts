@@ -1,9 +1,16 @@
 import { Tick } from "./models/Tick";
 
+
+export type Snapshot = {
+    date: string
+    time: string
+    ticks: Tick[]
+}
+
+
 export class TickerApi {
-    curDate = ''
-    curTime = ''
-    tokens = [];
+    snapshot: Snapshot = {} as Snapshot
+    symbols: string[] = [];
     currentListenCallback: ((ticks: Tick[]) => void) | null = null;
 
     constructor(timeframe: "realtime" | "1s" | "10s" | "1m" | "10m" = 'realtime') {
@@ -26,8 +33,8 @@ export class TickerApi {
 
     }
 
-    async getSnapShot(date: string, time: string): Promise<Tick[]> {
-        return []
+    async getSnapShot(date: string, time: string): Promise<Snapshot> {
+        return {} as Snapshot
     }
 
     async getAvailableSymbols(date?: string): Promise<Tick[]> {

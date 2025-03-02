@@ -1,6 +1,6 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import * as SQLite from 'expo-sqlite';
-import { TickerApi } from './TickerApi';
+import { Snapshot, TickerApi } from './TickerApi';
 import * as FileSystem from 'expo-file-system';
 import { PickedFile } from '../components/filepicker/FilePickerProps';
 import { Tick } from './models/Tick';
@@ -105,8 +105,16 @@ export class SqliteTickerApi extends TickerApi {
         return ticks;
     }
 
-    async getSnapShot(date: string, time: string): Promise<Tick[]> {
-        const placeholders = this.tokens.map(() => '?').join(',');
+    async getSnapShot(date: string, time: string): Promise<Snapshot> {
+        if (this.snapshot?.date == date
+            && this.snapshot.time == time
+            && this.snapshot.ticks?.length > 0) {
+            return this.snapshot
+        }
+        if (this.symbols.length == 0) {
+
+        }
+        const placeholders = this.symbols.map(() => '?').join(',');
         let query = `
             SELECT m.* FROM ${TABLE_NAME} m
             INNER JOIN (
@@ -118,12 +126,15 @@ export class SqliteTickerApi extends TickerApi {
             ON m.symbol = latest.symbol 
             AND m.datetime = latest.max_datetime
         `;
-        query = `
-        SELECT m.* FROM ${TABLE_NAME} m
-    `;
 
-        const result: any = await this.db.getAllAsync(query, this.tokens);
-        return result.map(this.mapDbRowToTick);
+        const result: any = await this.db.getAllAsync(query, this.symbols);
+        let ticks = result.map(this.mapDbRowToTick);
+        let snapshot = {
+            date,
+            time,
+            ticks
+        } as Snapshot
+        return snapshot
     }
 
     private mapDbRowToTick(row: any): Tick {

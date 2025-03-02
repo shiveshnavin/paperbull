@@ -13,6 +13,7 @@ import { EventListeners } from '../components/EventListeners';
 import { Provider } from 'react-redux';
 import { store } from '../components/store';
 import { SqliteTickerApi } from '../services/SqliteTickerApi';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -49,24 +50,26 @@ export default function RootLayout() {
   }
 
   return (
-    <Provider store={store}>
-      <AppContext.Provider value={{
-        context,
-        setContext
-      }} >
-        <ThemeContext.Provider value={context.theme} >
-          <SafeAreaView style={{
-            width: '100%',
-            height: '100%',
-            backgroundColor: context.theme.colors.background,
-            paddingBottom: context.theme?.insets?.bottom! + 70
-          }}>
-            <Slot />
-            <AppBottomBar />
-            <EventListeners />
-          </SafeAreaView>
-        </ThemeContext.Provider>
-      </AppContext.Provider>
-    </Provider>
+    <GestureHandlerRootView>
+      <Provider store={store}>
+        <AppContext.Provider value={{
+          context,
+          setContext
+        }} >
+          <ThemeContext.Provider value={context.theme} >
+            <SafeAreaView style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: context.theme.colors.background,
+              paddingBottom: context.theme?.insets?.bottom! + 70
+            }}>
+              <Slot />
+              <AppBottomBar />
+              <EventListeners />
+            </SafeAreaView>
+          </ThemeContext.Provider>
+        </AppContext.Provider>
+      </Provider>
+    </GestureHandlerRootView>
   );
 }

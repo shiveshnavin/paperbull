@@ -12,5 +12,8 @@ export function useStyle(theme: Theme) {
         fullscreen: {
             flex: 1,
         },
+        link: {
+            color: theme.colors.accent,
+        },
     });
 }
