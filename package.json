@@ -1,0 +1,26 @@
+{
+  "name": "paperbull",
+  "version": "1.0.0",
+  "description": "A virtual trading app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo skip test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shiveshnavin/paperbull.git"
+  },
+  "keywords": [
+    "paper",
+    "trading",
+    "paperbull",
+    "virtual",
+    "trading"
+  ],
+  "author": "Shivesh Navin",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/shiveshnavin/paperbull/issues"
+  },
+  "homepage": "https://github.com/shiveshnavin/paperbull#readme"
+}
