@@ -20,6 +20,7 @@ export type FilePickerProps = {
     auto?: boolean
     viewType?: "button" | "graphic"
     style?: ViewStyle
+    multiple?: boolean
 }
 
 export type FileType = {

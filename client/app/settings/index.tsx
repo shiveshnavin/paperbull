@@ -2,6 +2,7 @@ import { ButtonView, CardView, ThemeContext, TitleText, TransparentCenterToolbar
 import { useStyle } from "../../components/style";
 import { useContext } from "react";
 import { Button } from "react-native";
+import { FilePicker } from "../../components/filepicker/FilePicker";
 
 export default function Settings() {
     const theme = useContext(ThemeContext)
@@ -11,9 +12,12 @@ export default function Settings() {
             <TransparentCenterToolbar title="Settings" />
             <CardView>
                 <TitleText>Load CSV</TitleText>
-                <ButtonView onPress={() => {
+                <FilePicker
+                    text="Select File"
+                    onFiles={(files) => {
 
-                }}>Select File</ButtonView>
+                    }}
+                />
             </CardView>
         </VPage>
     )

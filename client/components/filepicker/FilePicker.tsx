@@ -18,7 +18,7 @@ export function FilePicker(props: FilePickerProps) {
         const result = await DocumentPicker.getDocumentAsync({
             copyToCacheDirectory: false,
             type: type?.mime || FileTypes.Others.mime,
-            multiple: true
+            multiple: props.multiple
         });
 
         if (result.assets == null) {
