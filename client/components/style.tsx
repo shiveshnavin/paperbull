@@ -1,10 +1,9 @@
 import { useTheme } from '@react-navigation/native';
 import { useContext } from 'react';
 import { StyleSheet, Image, Platform } from 'react-native';
-import { ThemeContext } from 'react-native-boxes';
+import { Theme, ThemeContext } from 'react-native-boxes';
 
-export function useStyle() {
-    const theme = useContext(ThemeContext)
+export function useStyle(theme: Theme) {
     return StyleSheet.create({
         container: {
             flex: 1,
