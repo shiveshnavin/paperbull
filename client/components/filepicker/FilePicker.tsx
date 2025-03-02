@@ -32,20 +32,9 @@ export function FilePicker(props: FilePickerProps) {
                 getChunk: async (offset: number, chunkSize: number) => {
                     try {
                         const fileUri = file.uri;
-                        const base64 = await RNFS.read(fileUri, chunkSize, offset, FileSystem.EncodingType.Base64);
-                        // const base64 = await FileSystem.readAsStringAsync(fileUri, {
-                        //     encoding: FileSystem.EncodingType.Base64,
-                        //     position: offset,
-                        //     length: chunkSize
-                        // });
-                        const binaryString = base64Decoder.decode(base64);
-                        const bytes = new Uint8Array(binaryString.length);
-                        for (let i = 0; i < binaryString.length; i++) {
-                            bytes[i] = binaryString.charCodeAt(i);
-                        }
-                        return bytes;
+                        const base64 = await RNFS.read(fileUri, chunkSize, offset, FileSystem.EncodingType.UTF8);
+                        return base64
                     } catch (error) {
-                        console.error('Error reading chunk:', error);
                         throw new Error('Error reading chunk:' + error)
                     }
                 }

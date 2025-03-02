@@ -3,24 +3,154 @@ import * as SQLite from 'expo-sqlite';
 import { TickerApi } from './TickerApi';
 import * as FileSystem from 'expo-file-system';
 import { PickedFile } from '../components/filepicker/FilePickerProps';
+import { Tick } from './models/Tick';
 
-const CHUNK_SIZE = 65536; // 64KB chunks
+const CHUNK_SIZE = 512 * 1024; // 64KB chunks
 const BATCH_SIZE = 200;    // Number of records per insert batch
-
+const TABLE_NAME = 'market_data'
+export type MarketDataRow = {
+    symbol: string
+    datetime: number
+    date: string
+    time: string
+    last_price: number
+}
 export class SqliteTickerApi extends TickerApi {
     db!: SQLiteDatabase;
 
-    async init() {
-        if (!this.db)
-            this.db = await SQLite.openDatabaseAsync('market_data.sqlite');
+
+    constructor(timeframe: "realtime" | "1s" | "10s" | "1m" | "10m" = 'realtime') {
+        super(timeframe)
     }
 
-    async loadFromCsv(file: PickedFile) {
+    async subscribe(instrumentToken: string[]) {
+
+    }
+
+    async listen(onTick: (ticks: Tick[]) => void) {
+
+    }
+
+    async seekForward(date: string, time: string, processIntermediates = true) {
+        // calls the onTick function with the ticks with timeframe sampling
+    }
+
+    async seekBack(date: string, time: string) {
+
+    }
+
+    async clearDb() {
+
+        await this.db?.execAsync(`DELETE from symbol_cache WHERE 1 = 1`)
+        return this.db?.execAsync(`DROP TABLE IF EXISTS ${TABLE_NAME}`)
+    }
+
+    async getDataSize(date?: string, time?: string): Promise<number> {
+        let query = `SELECT count(*) as cnt FROM ${TABLE_NAME} m `;
+        if (date) {
+            query = query + `WHERE date = '${date}'`
+        }
+        if (time) {
+            query = query + ` AND date = '${time}'`
+        }
+        const result: any = await this.db.getFirstAsync(query);
+        return result.cnt;
+    }
+    private async getFromCache(date?: string): Promise<MarketDataRow[]> {
+        const query = date
+            ? `SELECT * FROM symbol_cache WHERE date = ?;`
+            : `SELECT * FROM symbol_cache;`;
+        const result: MarketDataRow[] = await this.db.getAllAsync(query, date ? [date] : []);
+        return result
+    }
+
+    private async updateCache(rows: MarketDataRow[]): Promise<void> {
+        const query = `
+        INSERT OR REPLACE INTO symbol_cache (symbol, datetime, date, time, last_price)
+        VALUES (?, ?, ?, ?, ?);
+    `;
+        for (const row of rows) {
+            await this.db.runAsync(query, [
+                row.symbol,
+                row.datetime,
+                row.date,
+                row.time,
+                row.last_price
+            ]);
+            console.log('Inserted in cache', row)
+        }
+    }
+
+    async getAvailableSymbols(date?: string): Promise<Tick[]> {
+        const cachedResults = await this.getFromCache(date);
+        if (cachedResults.length > 0) {
+            return cachedResults.map(this.mapDbRowToTick);
+        }
+        console.log('Missing from cache')
+
+        let query = `
+            SELECT *
+                FROM market_data
+                WHERE (symbol, datetime) IN (
+                    SELECT symbol, MAX(datetime)
+                    FROM market_data
+                    ${date ? `WHERE date = '${date}'` : ''}  
+                    GROUP BY symbol
+                );
+        `;
+        const result: MarketDataRow[] = await this.db.getAllAsync(query);
+        const ticks = result.map(this.mapDbRowToTick);
+        await this.updateCache(result);
+
+        return ticks;
+    }
+
+    async getSnapShot(date: string, time: string): Promise<Tick[]> {
+        const placeholders = this.tokens.map(() => '?').join(',');
+        let query = `
+            SELECT m.* FROM ${TABLE_NAME} m
+            INNER JOIN (
+                SELECT symbol, MAX(datetime) AS max_datetime
+                FROM ${TABLE_NAME}
+                WHERE symbol IN (${placeholders})
+                GROUP BY symbol
+            ) latest 
+            ON m.symbol = latest.symbol 
+            AND m.datetime = latest.max_datetime
+        `;
+        query = `
+        SELECT m.* FROM ${TABLE_NAME} m
+    `;
+
+        const result: any = await this.db.getAllAsync(query, this.tokens);
+        return result.map(this.mapDbRowToTick);
+    }
+
+    private mapDbRowToTick(row: any): Tick {
+        return new Tick(row)
+    }
+
+    async init() {
+        if (!this.db) {
+            this.db = await SQLite.openDatabaseAsync('market_data.sqlite');
+            await this.createCacheTableIfNotExists()
+            await this.createTable()
+            await this.createIndex()
+        }
+    }
+
+    async loadFromCsv(
+        file: PickedFile,
+        onProgress?: (progress: number, total: number) => void,
+        setCancelHook?: (cancelCallback: () => void) => void) {
+        let isCancelled = false
+        setCancelHook && setCancelHook(() => {
+            console.log('Ingestion cancelled')
+            isCancelled = true
+        })
         const path = file.uri
-        await this.init()
+        await this.createTable()
         console.log('Loading CSV from ', path)
-        await this.createTable();
-        console.log('Table created')
 
         const fileInfo = await FileSystem.getInfoAsync(path);
         console.log('fileInfo', fileInfo)
@@ -33,16 +163,14 @@ export class SqliteTickerApi extends TickerApi {
         let remaining = '';
         let isFirstLine = true;
         let batch: any[] = [];
+        let recordSize = 0
 
         while (position < fileInfo.size) {
-            // const chunk = await FileSystem.readAsStringAsync(path, {
-            //     encoding: FileSystem.EncodingType.UTF8,
-            //     position,
-            //     length: CHUNK_SIZE,
-            // });
+            if (isCancelled) {
+                return
+            }
+            onProgress && onProgress(position, fileInfo.size)
             const chunk = await file.reader.getChunk(position, CHUNK_SIZE)
-            console.log('Reading chunk@', position, CHUNK_SIZE)
-
             const content = remaining + chunk;
             const lines = content.split('\n');
             remaining = lines.pop() || '';
@@ -50,13 +178,14 @@ export class SqliteTickerApi extends TickerApi {
             for (const line of lines) {
                 if (isFirstLine) {
                     isFirstLine = false;
-                    continue; // Skip header
+                    continue;
                 }
 
                 const record = this.parseLine(line);
                 if (record) {
                     batch.push(record);
                     if (batch.length >= BATCH_SIZE) {
+                        recordSize += batch.length
                         await this.insertBatch(batch);
                         batch = [];
                     }
@@ -66,16 +195,17 @@ export class SqliteTickerApi extends TickerApi {
             position += CHUNK_SIZE;
         }
 
-        // Process remaining content
         if (remaining && !isFirstLine) {
             const record = this.parseLine(remaining);
             if (record) batch.push(record);
         }
 
-        // Insert final batch
         if (batch.length > 0) {
             await this.insertBatch(batch);
         }
+        recordSize += batch.length
+        onProgress && onProgress(recordSize, recordSize)
+
     }
 
     private parseLine(line: string): any {
@@ -112,10 +242,7 @@ export class SqliteTickerApi extends TickerApi {
     }
 
     async insertBatch(batch: any[]) {
-        console.log('insertBatch', batch)
-
         if (batch.length === 0) return;
-
         const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(',');
         const sql = `INSERT INTO market_data (symbol, datetime, date, time, last_price) VALUES ${placeholders}`;
 
@@ -132,7 +259,7 @@ export class SqliteTickerApi extends TickerApi {
 
     async createTable() {
         await this.db.execAsync(`
-            CREATE TABLE IF NOT EXISTS market_data (
+            CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
                 symbol TEXT,
                 datetime INTEGER,
                 date TEXT,
@@ -140,5 +267,21 @@ export class SqliteTickerApi extends TickerApi {
                 last_price REAL
             );
         `);
+    }
+    private async createCacheTableIfNotExists() {
+        await this.db.execAsync(`
+            CREATE TABLE IF NOT EXISTS symbol_cache (
+                symbol TEXT,
+                datetime INTEGER,
+                date TEXT,
+                time TEXT,
+                last_price REAL
+            );
+        `);
+    }
+    async createIndex() {
+        await this.db.execAsync(`
+            CREATE INDEX idx_symbol_date_time_${TABLE_NAME} ON users(symbol, date, time);
+        `)
     }
 }

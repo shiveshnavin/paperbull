@@ -18,11 +18,16 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [apiInit, setApiInit] = useState(false)
   const [context, setContext] = useState<Context>(() => {
     const ctx = new Context()
     const theme = new Theme('appname', colorScheme === 'dark' ? DarkColors : Colors);
     ctx.theme = theme
-    ctx.tickApi = new SqliteTickerApi()
+    let db = new SqliteTickerApi()
+    db.init().finally(() => {
+      setApiInit(true)
+    })
+    ctx.tickApi = db
     return ctx
   })
 
@@ -33,11 +38,11 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && apiInit) {
       SplashScreen.hideAsync();
       router.replace('/settings')
     }
-  }, [loaded]);
+  }, [loaded, apiInit]);
 
   if (!loaded) {
     return null;

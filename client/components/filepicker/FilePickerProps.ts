@@ -9,7 +9,7 @@ export type PickedFile = {
     updated?: string
     webFile?: any
     reader: {
-        getChunk: (offset: number, chunkSize: number) => Promise<Uint8Array>
+        getChunk: (offset: number, chunkSize: number) => Promise<any>
     }
 }
 export type FilePickerProps = {

@@ -6126,10 +6126,10 @@ react-native-base64@^0.2.1:
   resolved "https://registry.yarnpkg.com/react-native-base64/-/react-native-base64-0.2.1.tgz#3d0e73a649c4c0129f7b7695d3912456aebae847"
   integrity sha512-eHgt/MA8y5ZF0aHfZ1aTPcIkDWxza9AaEk4GcpIX+ZYfZ04RcaNahO+527KR7J44/mD3efYfM23O2C1N44ByWA==
 
-react-native-boxes@^1.4.65:
-  version "1.4.65"
-  resolved "https://registry.yarnpkg.com/react-native-boxes/-/react-native-boxes-1.4.65.tgz#98dfebc1ba63470bb09ae1d6b0202b03a05da260"
-  integrity sha512-x0+m8DHjjb65/svO8J5ZstQBB2GzueSReEaAklItB26Zw1JaSyPThAH2xZuAhHorU38TOA3r+k3+lAY82Uz+jg==
+react-native-boxes@^1.4.67:
+  version "1.4.67"
+  resolved "https://registry.yarnpkg.com/react-native-boxes/-/react-native-boxes-1.4.67.tgz#4782ab4b451271b65bda7208e219d6e0a2c2a880"
+  integrity sha512-4oMfyxDY/EEke5y+Hmjm7FEDcyyq1KVT099R5Mm3shc8pNHzmm39gs4SgqYWhNMuNxbOtfRouM+UtcFAuWVyVw==
   dependencies:
     "@react-native-async-storage/async-storage" "^1.23.1"
     expo-web-browser "^13.0.3"
