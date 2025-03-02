@@ -13,9 +13,10 @@ export default function Settings() {
             <CardView>
                 <TitleText>Load CSV</TitleText>
                 <FilePicker
+                    auto={false}
                     text="Select File"
                     onFiles={(files) => {
-
+                        console.log('Picked files', files)
                     }}
                 />
             </CardView>

@@ -69,7 +69,7 @@ export function FilePicker(props: FilePickerProps) {
         onFiles(files);
     };
 
-    useEffect(() => { handleFileSelection() }, [auto])
+    useEffect(() => { auto && handleFileSelection() }, [auto])
 
     if (viewType == 'graphic') {
         return (
