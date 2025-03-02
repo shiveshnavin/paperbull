@@ -12,6 +12,7 @@ import { AppContext, Context } from '../components/AppContext';
 import { EventListeners } from '../components/EventListeners';
 import { Provider } from 'react-redux';
 import { store } from '../components/store';
+import { SqliteTickerApi } from '../services/SqliteTickerApi';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,6 +22,7 @@ export default function RootLayout() {
     const ctx = new Context()
     const theme = new Theme('appname', colorScheme === 'dark' ? DarkColors : Colors);
     ctx.theme = theme
+    ctx.tickApi = new SqliteTickerApi()
     return ctx
   })
 
@@ -33,7 +35,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
-      router.replace('/watchlist')
+      router.replace('/settings')
     }
   }, [loaded]);
 

@@ -1,6 +1,8 @@
-import SQLite, { SQLiteDatabase } from 'expo-sqlite';
+import { SQLiteDatabase } from 'expo-sqlite';
+import * as SQLite from 'expo-sqlite';
 import { TickerApi } from './TickerApi';
 import * as FileSystem from 'expo-file-system';
+import { PickedFile } from '../components/filepicker/FilePickerProps';
 
 const CHUNK_SIZE = 65536; // 64KB chunks
 const BATCH_SIZE = 200;    // Number of records per insert batch
@@ -9,12 +11,19 @@ export class SqliteTickerApi extends TickerApi {
     db!: SQLiteDatabase;
 
     async init() {
-        this.db = await SQLite.openDatabaseAsync('market_data.sqlite');
+        if (!this.db)
+            this.db = await SQLite.openDatabaseAsync('market_data.sqlite');
     }
 
-    async loadFromCsv(path: string) {
+    async loadFromCsv(file: PickedFile) {
+        const path = file.uri
+        await this.init()
+        console.log('Loading CSV from ', path)
         await this.createTable();
+        console.log('Table created')
+
         const fileInfo = await FileSystem.getInfoAsync(path);
+        console.log('fileInfo', fileInfo)
 
         if (!fileInfo.exists) {
             throw new Error(`File not found: ${path}`);
@@ -26,11 +35,13 @@ export class SqliteTickerApi extends TickerApi {
         let batch: any[] = [];
 
         while (position < fileInfo.size) {
-            const chunk = await FileSystem.readAsStringAsync(path, {
-                encoding: FileSystem.EncodingType.UTF8,
-                position,
-                length: CHUNK_SIZE,
-            });
+            // const chunk = await FileSystem.readAsStringAsync(path, {
+            //     encoding: FileSystem.EncodingType.UTF8,
+            //     position,
+            //     length: CHUNK_SIZE,
+            // });
+            const chunk = await file.reader.getChunk(position, CHUNK_SIZE)
+            console.log('Reading chunk@', position, CHUNK_SIZE)
 
             const content = remaining + chunk;
             const lines = content.split('\n');
@@ -101,6 +112,8 @@ export class SqliteTickerApi extends TickerApi {
     }
 
     async insertBatch(batch: any[]) {
+        console.log('insertBatch', batch)
+
         if (batch.length === 0) return;
 
         const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(',');

@@ -1,10 +1,10 @@
 import React, { useContext } from "react";
 import { Theme } from "react-native-boxes";
+import { TickerApi } from "../services/TickerApi";
 
 export class Context {
-
-    theme = new Theme()
-
+    theme!: Theme
+    tickApi!: TickerApi
 }
 
 
