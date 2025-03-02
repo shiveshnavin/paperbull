@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.paperbull.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo-t.png",
         "backgroundColor": "#ffffff"
