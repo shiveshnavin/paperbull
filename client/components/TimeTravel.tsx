@@ -57,7 +57,10 @@ export function TimeTravel() {
                     margin: 0,
                     padding: 0,
                 }}
-                onSelect={setSelectedPlayType}
+                onSelect={(id) => {
+                    tickerApi.uiTimeframe = id as any
+                    setSelectedPlayType(id)
+                }}
                 selectedId={selectedPlayType}
                 title="Play type in UI"
                 options={[{
@@ -70,8 +73,8 @@ export function TimeTravel() {
                     title: 'Minute by Minute'
                 },
                 {
-                    id: 'fast',
-                    value: 'fast',
+                    id: 'fastforward',
+                    value: 'fastforward',
                     title: 'Fast forward'
                 }]} />
 

@@ -14,9 +14,11 @@ export class TickerApi {
     symbols: string[] = [];
     currentListenCallback: ((ticks: Tick[]) => void) | null = null;
     timeframe: "realtime" | "1s" | "10s" | "1m" | "10m"
+    uiTimeframe: "realtime" | "minute" | "fastforward"
 
     constructor(timeframe: "realtime" | "1s" | "10s" | "1m" | "10m" = 'realtime') {
         this.timeframe = timeframe
+        this.uiTimeframe = "realtime"
     }
 
     async getTimeFrames(): Promise<string[]> {
