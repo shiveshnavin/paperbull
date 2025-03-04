@@ -5,6 +5,11 @@ import { AppContext } from '../components/AppContext';
 import { Snapshot } from '../services/TickerApi';
 import { useEventListener } from '../components/store';
 import { Topic } from '../components/EventListeners';
+import { ScipDisplay } from '../components/Instrument';
+import { Tick } from '../services/models/Tick';
+import { PaperbullTimeBar } from '../components/Slider';
+import { PaperbullToolbar } from '../components/PaperbullToolbar';
+import { parseTime } from '../components/TimeTravel';
 
 export default function Watchlist() {
   const theme = useContext(ThemeContext)
@@ -33,13 +38,18 @@ export default function Watchlist() {
   })
   return (
     <VPage style={styles.container}>
-      <TransparentCenterToolbar title="Watchlist" options={[{
-        id: 'refresh',
-        icon: 'refresh',
-        onClick: () => {
-          fetchSnapShot()
-        }
-      }]} />
+      <PaperbullToolbar
+        time={parseTime(tickerApi.snapshot.time)}
+
+        title="Watchlist"
+
+        options={[{
+          id: 'refresh',
+          icon: 'refresh',
+          onClick: () => {
+            fetchSnapShot()
+          }
+        }]} />
       <KeyboardAvoidingScrollView>
         {
           error && (
@@ -50,9 +60,10 @@ export default function Watchlist() {
         {
           snapshot?.ticks?.map(t => {
             return (
-              <TextView key={t.symbol}>
-                {t.symbol} {t.last_price}
-              </TextView>
+              <ScipDisplay key={t.symbol} tick={t} prevTick={new Tick({
+                ...t,
+                last_price: t.last_price - 10
+              })} />
             )
           })
         }

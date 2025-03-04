@@ -55,6 +55,42 @@ export class Tick {
         return `${year}-${month}-${day}`;
     }
 
+    getType() {
+        if (this.symbol.includes("INDEX")) {
+            return "Index"
+        }
+        else if (this.symbol.includes("CE")) {
+            return "Call Option"
+        }
+        else if (this.symbol.includes("PE")) {
+            return "Put Option"
+        }
+        else if (this.symbol.includes("FUT")) {
+            return "Future"
+        } else {
+            return "Equity"
+        }
+    }
+
+    getReadableName() {
+        let symbol = this.symbol
+        if (!symbol) {
+            return "";
+        }
+        const parts = symbol.match(/([A-Z]+)(\d{4})(\d{2})(\d{2})(CE|PE)(\d+)/);
+        if (!parts) {
+            return symbol.split("-")[0]?.trim(); // Return original if parsing fails
+        }
+        const [, underlying, year, month, day, optionType, strikePrice] = parts;
+        const monthNames = [
+            "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+            "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+        ];
+        const monthIndex = parseInt(month, 10) - 1;
+        const monthName = monthNames[monthIndex];
+        return `${underlying} ${monthName} ${parseInt(day, 10)} ${strikePrice} ${optionType}`;
+    }
+
     summary() {
         let copy: any = {};
         Object.assign(copy, this)

@@ -1,9 +1,11 @@
 import { useContext, useEffect, useState } from "react";
-import { ButtonView, Caption, Center, HBox, Title, TransparentButton, VBox } from "react-native-boxes";
+import { ButtonView, Caption, Center, DropDownView, HBox, Icon, Title, TransparentButton, VBox } from "react-native-boxes";
 import { AppContext } from "./AppContext";
 import { Button, FlatList } from "react-native";
 import { useEventPublisher } from "./store";
 import { Topic } from "./EventListeners";
+import { PaperbullTimeBar } from "./Slider";
+import { useStyle } from "./style";
 // import Slider from '@react-native-community/slider';
 
 export function TimeTravel() {
@@ -13,43 +15,70 @@ export function TimeTravel() {
     const [times, setTimes] = useState<string[]>([])
     const [enabled, setEnabled] = useState(false)
     const publishEvent = useEventPublisher()
-    const [prevsliderValue] = useState(tickerApi.snapshot.time);
-    const [sliderValue, setSliderValue] = useState(times[10]);
+    const [prevsliderValue, setPreSliderValue] = useState(times.indexOf(tickerApi.snapshot.time) > -1 ? times.indexOf(tickerApi.snapshot.time) : 0);
+    const [sliderValue, setSliderValue] = useState(0);
+    const [selectedPlayType, setSelectedPlayType] = useState("realtime")
+    const style = useStyle(theme)
 
     useEffect(() => {
         tickerApi.getTimeFrames().then(setTimes)
     }, [])
     return (
         <VBox>
-            <Center>
+            <Center style={{
+                marginTop: theme.dimens.space.lg,
+                flexDirection: 'row'
+            }}>
+                <Title style={{
+                    color: theme.colors.caption
+                }}>
+                    {parseTime(times[prevsliderValue])}
+                </Title>
+                <Icon name="arrow-right" style={{
+                    padding: theme.dimens.space.md
+                }} />
                 <Title>
-                    {sliderValue}
+                    {parseTime(times[sliderValue])}
                 </Title>
             </Center>
-            {/* <Slider
-                style={{ width: 200, height: 40 }}
-                minimumValue={0}
-                maximumValue={1}
-                minimumTrackTintColor="#FFFFFF"
-                maximumTrackTintColor="#000000"
-            /> */}
-
-            <FlatList
+            <PaperbullTimeBar
                 style={{
-                    maxHeight: 300
+                    marginTop: theme.dimens.space.lg,
+                    marginBottom: theme.dimens.space.lg,
                 }}
-                data={times}
-                renderItem={(time) => {
-
-                    return (
-                        <TransparentButton text={time.item} onPress={() => {
-                            setSliderValue(time.item)
-                        }} />
-                    )
-                }}
+                minimumValue={0}
+                maximumValue={times.length - 1}
+                value={sliderValue}
+                onValueChange={setSliderValue}
             />
+
+            <DropDownView
+                style={{
+                    margin: 0,
+                    padding: 0,
+                }}
+                onSelect={setSelectedPlayType}
+                selectedId={selectedPlayType}
+                title="Play type in UI"
+                options={[{
+                    id: 'realtime',
+                    value: 'realtime',
+                    title: 'Realtime'
+                }, {
+                    id: 'minute',
+                    value: 'minute',
+                    title: 'Minute by Minute'
+                },
+                {
+                    id: 'fast',
+                    value: 'fast',
+                    title: 'Fast forward'
+                }]} />
+
             <Center style={{
-                width: '100%',
+                flex: 1,
+                marginRight: theme.dimens.space.sm,
+                marginLeft: theme.dimens.space.sm,
                 flexDirection: 'row'
             }}>
                 <ButtonView
@@ -57,34 +86,76 @@ export function TimeTravel() {
                         width: '50%'
                     }}
                     onPress={() => {
-                        if (parseInt(sliderValue) < parseInt(prevsliderValue)) {
-                            tickerApi.getSnapShot(tickerApi.snapshot.date, sliderValue).then(snapshot => {
+                        if ((sliderValue) < (prevsliderValue)) {
+                            tickerApi.getSnapShot(tickerApi.snapshot.date, times[sliderValue]).then(snapshot => {
                                 publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
                             })
                         } else {
-                            tickerApi.getSnapShot(tickerApi.snapshot.date, sliderValue).then(snapshot => {
+                            tickerApi.getSnapShot(tickerApi.snapshot.date, times[sliderValue]).then(snapshot => {
                                 publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
                             })
                         }
+                        setPreSliderValue(sliderValue)
                     }}>Seek</ButtonView>
                 <ButtonView
-                    disabled={parseInt(sliderValue) < parseInt(prevsliderValue)}
+                    disabled={(sliderValue) < (prevsliderValue)}
                     style={{
                         width: '50%',
                         backgroundColor: (
-                            parseInt(sliderValue) < parseInt(prevsliderValue) ? theme.colors.caption : theme.colors.accent
+                            (sliderValue) < (prevsliderValue) ? theme.colors.caption : theme.colors.accent
                         )
                     }}
                     onPress={() => {
-                        tickerApi.seekForward(tickerApi.snapshot.date, sliderValue, false).then(snapshot => {
+                        tickerApi.seekForward(tickerApi.snapshot.date, times[sliderValue], false).then(snapshot => {
                             publishEvent(Topic.SNAPSHOT_UPDATE, true)
                         })
+                        setPreSliderValue(sliderValue)
                     }}>Play</ButtonView>
             </Center>
 
-            <Caption>
-                Time travel lets you seek forward and backward in time.
+            <Caption style={{
+                marginRight: 0,
+                marginLeft: 0
+            }}>
+                With Seek, You can directly jump to the specified time. It does not read the data in between and and just pulls out the data at the end of the seeked minute. You orders will not get triggered.
+            </Caption>
+            <Caption style={{
+                marginRight: 0,
+                marginLeft: 0
+            }}>
+                With Play, Each tick will be processed and orders if any will get triggered. You can choose to watch the data in UI minute by minute or directly jump using fast forward. You cannot play while travelling back in time.
             </Caption>
         </VBox>
     )
+}
+
+export function parseTime(time: string) {
+    if (typeof time !== 'string' || time.length !== 4) {
+        return "Invalid time format"; // Handle invalid input
+    }
+
+    const hours = parseInt(time.substring(0, 2), 10);
+    const minutes = parseInt(time.substring(2, 4), 10);
+
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        return "Invalid time values"; // Handle invalid time values
+    }
+
+    let period = "AM";
+    let formattedHours = hours;
+
+    if (hours >= 12) {
+        period = "PM";
+        if (hours > 12) {
+            formattedHours -= 12;
+        }
+    }
+
+    if (formattedHours === 0) {
+        formattedHours = 12; // Handle midnight
+    }
+
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+
+    return `${formattedHours}:${formattedMinutes} ${period}`;
 }

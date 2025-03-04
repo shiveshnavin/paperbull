@@ -5,6 +5,10 @@ import { Theme, ThemeContext } from 'react-native-boxes';
 
 export function useStyle(theme: Theme) {
     return StyleSheet.create({
+        nospaces: {
+            margin: 0,
+            padding: 0,
+        },
         container: {
             flex: 1,
             padding: theme.dimens.space.md,
