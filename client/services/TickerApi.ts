@@ -21,7 +21,7 @@ export class TickerApi {
     currentListenCallback: ((ticks: Tick[]) => void) | null = null;
     protected resolution: Resolution
     uiTimeframe: UIResolution
-    intervalId: number | null = null
+    intervalId: number | null | any = null
 
     constructor(timeframe: Resolution = 'realtime') {
         this.resolution = timeframe
@@ -30,7 +30,7 @@ export class TickerApi {
 
 
     setSnapshot(snapshot: Snapshot) {
-        this.snapshotPrev = snapshot
+        this.snapshotPrev = this.snapshot
         this.snapshot = snapshot
     }
 
@@ -79,10 +79,6 @@ export class TickerApi {
         return `${hoursString}${minutesString}`;
     }
 
-    isPlaying() {
-        return this.intervalId != null
-    }
-
     setResolution(
         resolution: Resolution,
     ) {
@@ -101,61 +97,84 @@ export class TickerApi {
         return this.symbols
     }
 
-    onTick?: (ticks: Tick[]) => Promise<void> = undefined
-    async listen(onTick: (ticks: Tick[]) => Promise<void>) {
+    onTick?: (ticks: Tick[], dateTime: number) => Promise<void> = undefined
+    onError?: (r: Error) => void = undefined
+    async listen(onTick: (ticks: Tick[], dateTime: number) => Promise<void>, onError?: (e: Error) => void) {
         this.onTick = onTick
+        this.onError = onError
     }
 
     async stopSeek() {
         this.intervalId && clearInterval(this.intervalId)
+        this.intervalId = null
+    }
+
+    isPlaying() {
+        return this.intervalId != null
     }
 
     async getTicks(datetimefrom: number, datetimeto: number, onTick: (ticks: Tick[]) => Promise<void>)
         : Promise<number> {
-        return 0
+        throw new Error('getTicks Not implemented')
     }
 
-    async seekForward(date: string, time: string, processIntermediates = true) {
-        if (this.intervalId) {
-            clearInterval(this.intervalId)
-        }
+    async seekForward(date: string, time: string) {
+        this.stopSeek()
+        this.intervalId = 1
         let curdateTime = toEpochMs((this.getCurrentSnapshot()).date, (this.getCurrentSnapshot()).time);
         let finaldateTime = toEpochMs(date, time);
         if (this.uiTimeframe == 'fastforward') {
             await this.getTicks(curdateTime, finaldateTime, async (ticks) => {
-                this.setSnapshot({
-                    date,
-                    time,
-                    ticks
-                })
-                this.onTick && (await this.onTick(ticks))
-            })
+                if (this.intervalId == null) {
+                    throw new Error('Seek stopped')
+                }
+                this.onTick && (await this.onTick(ticks, finaldateTime))
+            }).catch(e => {
+                if (!e.message.includes("Seek stopped"))
+                    throw e
+            }).catch(this.onError)
+
+            // the expectation is that the tick listener will aggregate the ticks
+            // and only publish them to UI when there are no more ticks to process
+            // i.e. when the more ticks is an empty array
+            this.stopSeek()
+            this.onTick && (await this.onTick([], finaldateTime))
+
         } else if (this.uiTimeframe == 'realtime') {
-            while (curdateTime < finaldateTime) {
-                curdateTime = curdateTime + 100
-                await this.getTicks(curdateTime, curdateTime, async (ticks) => {
-                    this.setSnapshot({
-                        date,
-                        time,
-                        ticks
-                    })
-                    this.onTick && (await this.onTick(ticks))
-                })
-                await sleep(100)
+            console.log('seek forward!!', curdateTime, '->', finaldateTime)
+            let loadNextMinute = async () => {
+
+                if (curdateTime < finaldateTime) {
+
+                    let nextHit = curdateTime + 100
+                    await this.getTicks(curdateTime, nextHit, async (ticks) => {
+                        console.log('ticks', ticks.length)
+                        this.onTick && (await this.onTick(ticks, nextHit))
+                    }).catch(this.onError)
+                    curdateTime = nextHit
+                    this.intervalId = setTimeout(loadNextMinute, 100)
+                } else {
+                    this.stopSeek()
+                    this.onTick && (await this.onTick([], finaldateTime))
+                }
             }
+            loadNextMinute()
+
         } else if (this.uiTimeframe == 'minute') {
-            while (curdateTime < finaldateTime) {
-                curdateTime = curdateTime + 60 * 1000
-                await this.getTicks(curdateTime, curdateTime, async (ticks) => {
-                    this.setSnapshot({
-                        date,
-                        time,
-                        ticks
+            let loadNextMinute = async () => {
+                if (curdateTime < finaldateTime) {
+                    let nextHit = curdateTime + 60 * 1000
+                    await this.getTicks(curdateTime, nextHit, async (ticks) => {
+                        this.onTick && (await this.onTick(ticks, nextHit))
                     })
-                    this.onTick && (await this.onTick(ticks))
-                })
-                await sleep(1000)
+                    curdateTime = nextHit
+                    this.intervalId = setTimeout(loadNextMinute, 1000)
+                } else {
+                    this.stopSeek()
+                    this.onTick && (await this.onTick([], finaldateTime))
+                }
             }
+            loadNextMinute()
         }
     }
 
@@ -177,7 +196,7 @@ export class TickerApi {
 }
 
 function toEpochMs(date: string, time: string) {
-    return new Date(`${date}T${time.slice(0, 2)}:${time.slice(2, 4)}:00.000Z`).getTime()
+    return new Date(`${date}T${time.slice(0, 2)}:${time.slice(2, 4)}:00.000+05:30`).getTime();
 }
 
 function sleep(ms: number) {

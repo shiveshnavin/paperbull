@@ -1,11 +1,12 @@
-import { useContext, useState } from "react"
+import { useCallback, useContext, useEffect, useState } from "react"
 import { PickedFile } from "../components/filepicker/FilePickerProps"
 import { Topic, useEventListener, useEventPublisher } from "../components/store"
 import { AppContext } from "../components/AppContext"
 import { SqliteTickerApi } from "../services/SqliteTickerApi"
 import { BottomSheet } from "react-native-boxes"
 import { TimeTravel } from "../components/TimeTravel"
-import { Resolution } from "../services/TickerApi"
+import { Resolution, Snapshot } from "../services/TickerApi"
+import { Tick } from "../services/models/Tick"
 
 export function EventListeners() {
     const [showTimeTravel, setShowTimeTravel] = useState(false)
@@ -13,6 +14,57 @@ export function EventListeners() {
     const appContext = useContext(AppContext)
     const tickerApi = appContext.context.tickApi
     const publishEvent = useEventPublisher()
+
+    useEffect(() => {
+        let frame = new Map<string, Tick>()
+        tickerApi.getCurrentSnapshot().ticks.forEach(t => {
+            frame.set(t.symbol, t)
+        })
+        let curFrameDatetimems: number = 0
+        const $1Minute = 60 * 1000
+        tickerApi.listen(async (ticks: Tick[], dateTime) => {
+            // todo: process orders
+
+            if (ticks.length == 0) {
+                let dummyTick = new Tick({
+                    datetime: dateTime
+                })
+                let dummySnapshot = {
+                    date: dummyTick.getDate(),
+                    time: dummyTick.getTime(),
+                    ticks: Array.from(frame.values())
+                } as Snapshot
+                tickerApi.setSnapshot(dummySnapshot)
+                publishEvent(Topic.SNAPSHOT_UPDATE, dummySnapshot)
+                return
+            }
+
+            if (curFrameDatetimems == 0) {
+                curFrameDatetimems = ticks[0]?.datetime
+            }
+
+            let uiTimeFrame = tickerApi.uiTimeframe
+            if (uiTimeFrame == 'minute') {
+                for (let tick of ticks) {
+                    if (tick.datetime < (curFrameDatetimems + $1Minute)) {
+                        frame.set(tick.symbol, tick)
+                    }
+                    else {
+                        curFrameDatetimems = tick.datetime
+                        publishEvent(Topic.SNAPSHOT_UPDATE, {
+                            date: tick.getDate(),
+                            time: tick.getTime(),
+                            ticks: Array.from(frame.values())
+                        } as Snapshot)
+                    }
+                }
+
+            }
+
+        }, (e) => {
+            console.log(e)
+        })
+    }, [tickerApi])
 
     useEventListener(Topic.TIME_TRAVEL, async () => {
         setShowTimeTravel(true)

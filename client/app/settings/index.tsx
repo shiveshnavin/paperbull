@@ -377,15 +377,15 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { sym
                     setLoading(true)
                     tickerApi.subscribe(selected, resolution, (p, t) => {
                         setLoadProgress((p * 100 / t))
+                    }).then(() => {
+                        onDone(selected)
+                    }).catch(e => {
+                        console.log('tickerApi.subscribe', e)
+                        setErocessError(e.message)
+                        setLoadProgress(-1)
+                    }).finally(() => {
+                        setLoading(false)
                     })
-                        .catch(e => {
-                            console.log(e)
-                            setErocessError(e.message)
-                        })
-                        .finally(() => {
-                            setLoading(false)
-                            onDone(selected)
-                        })
                 }} />
             {
                 loadProgress > -1 && (
@@ -397,7 +397,7 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { sym
                 )
             }
             {
-                processError && <TextView>{processError}</TextView>
+                processError && <TextView style={{ color: theme.colors.critical }}>{processError}</TextView>
             }
         </VBox>
     );

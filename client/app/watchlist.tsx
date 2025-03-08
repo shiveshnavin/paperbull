@@ -9,6 +9,7 @@ import { Tick } from '../services/models/Tick';
 import { PaperbullTimeBar } from '../components/Slider';
 import { PaperbullToolbar } from '../components/PaperbullToolbar';
 import { parseTime } from '../components/TimeTravel';
+import { SqliteTickerApi } from '../services/SqliteTickerApi';
 
 export default function Watchlist() {
   const theme = useContext(ThemeContext)
@@ -29,7 +30,7 @@ export default function Watchlist() {
   }
 
   useEffect(() => {
-    fetchSnapShot()
+    // fetchSnapShot()
   }, [tickerApi.getCurrentSnapshot()])
 
   useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot) => {

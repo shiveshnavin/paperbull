@@ -76,7 +76,7 @@ export class SqliteTickerApi extends TickerApi {
             FROM ${TABLE_MARKET_DATA_FULL} 
             WHERE symbol IN (${tokensPlaceholder})
           `;
-            const countResult: any[] = await this.dbCold.getAllSync(countQuery, instrumentTokens);
+            const countResult: any[] = await this.dbCold.getAllAsync(countQuery, instrumentTokens);
             totalRows = countResult[0].count;
         } catch (error) {
             console.error("Error fetching total count. Progress may not be accurate.", error);
@@ -87,11 +87,13 @@ export class SqliteTickerApi extends TickerApi {
         let offset = 0;
         // Keep track of the last accepted datetime for each symbol.
         const lastCopied: { [symbol: string]: number } = {};
+        let inserts = 0
+        if (onProgress) onProgress(processed, totalRows);
 
         // Process the data in batches.
         while (!isCancelled) {
             const batchQuery = `${baseQuery} LIMIT ${batchSize} OFFSET ${offset}`;
-            const batch: any[] = await this.dbCold.getAllSync(batchQuery, instrumentTokens);
+            const batch: any[] = await this.dbCold.getAllAsync(batchQuery, instrumentTokens);
             if (batch.length === 0) {
                 break;
             }
@@ -122,6 +124,7 @@ export class SqliteTickerApi extends TickerApi {
 
             }
             if (toInsertBatch.length > 0) {
+                inserts = inserts + toInsertBatch.length
                 const placeholders = toInsertBatch.map(() => '(?, ?, ?, ?, ?)').join(',');
                 const sql = `INSERT INTO ${TABLE_MARKET_DATA_RUNTIME} (symbol, datetime, date, time, last_price) VALUES ${placeholders}`;
                 const params = toInsertBatch.flatMap(record => [
@@ -138,6 +141,7 @@ export class SqliteTickerApi extends TickerApi {
             if (batch.length < batchSize) break;
             offset += batchSize;
         }
+        console.log('subscribed ', inserts, 'data points captured in hot db')
     }
 
     async clearDb() {
@@ -159,20 +163,26 @@ export class SqliteTickerApi extends TickerApi {
         while (true) {
             const query = `
             SELECT * FROM ${TABLE_MARKET_DATA_RUNTIME} 
-            WHERE (datetime >= ? )
-            AND (date < ? )
+            WHERE (datetime >= ${datetimefrom} )
+            AND (datetime <= ${datetimeto} )
             ORDER BY datetime ASC
-            LIMIT ? OFFSET ?
+            LIMIT ${batchSize} OFFSET ${offset}
         `;
 
+            let dum = new Tick({
+                datetime: datetimefrom
+            })
+            let dum2 = new Tick({
+                datetime: datetimeto
+            })
+            console.log('query', dum.getTime(), dum2.getTime(), query)
             const params = [datetimefrom, datetimeto, batchSize, offset];
 
-            const result: any = await this.dbHot.getAllAsync(query, params);
+            const result: any = await this.dbHot.getAllAsync(query);//, params
             let ticks = result.map(this.mapDbRowToTick);
-
+            await onTick(ticks);
             if (ticks.length === 0) break;
 
-            await onTick(ticks);
             totalFetched += ticks.length;
             offset += batchSize;
         }
@@ -290,6 +300,21 @@ export class SqliteTickerApi extends TickerApi {
             await this.createFullMktIndex()
             await this.createHotMktIndex()
         }
+    }
+
+    async test() {
+
+        console.log('run test quer 5');
+
+        //@ts-ignore
+        (this.dbHot.getAllAsync(`
+            SELECT symbol, count(*) as avount FROM market_data_runtime 
+            group by symbol
+            `)).then((res) => {
+            console.log(res)
+        }).catch((e: any) => {
+            console.log('errr in init q', e.message)
+        })
     }
 
     async loadFromCsv(

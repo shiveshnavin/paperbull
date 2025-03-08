@@ -1,10 +1,11 @@
 import { useContext, useEffect, useReducer, useState } from "react";
-import { ButtonView, Caption, Center, DropDownView, HBox, Icon, PressableView, TextView, Title, TransparentButton, VBox } from "react-native-boxes";
+import { ButtonView, Caption, Center, DropDownView, HBox, Icon, PressableView, Storage, TextView, Title, TitleText, TransparentButton, VBox } from "react-native-boxes";
 import { AppContext } from "./AppContext";
 import { Button, FlatList } from "react-native";
-import { Topic, useEventPublisher } from "./store";
+import { Topic, useEventListener, useEventPublisher } from "./store";
 import { PaperbullTimeBar } from "./Slider";
 import { useStyle } from "./style";
+import { Snapshot, UIResolution } from "../services/TickerApi";
 // import Slider from '@react-native-community/slider';
 
 export function TimeTravel() {
@@ -21,14 +22,28 @@ export function TimeTravel() {
     const [preDateValue, setPreDateValue] = useState(tickerApi.getCurrentSnapshot().date);
     const [dateValue, setDateValue] = useState(tickerApi.getCurrentSnapshot().date);
 
-    const [prevsliderValue, setPreSliderValue] = useState(times.indexOf(tickerApi.getCurrentSnapshot().time) > -1 ? times.indexOf(tickerApi.getCurrentSnapshot().time) : 0);
-    const [sliderValue, setSliderValue] = useState(0);
+    const [prevTimeValue, setPreTimeValue] = useState(times.indexOf(tickerApi.getCurrentSnapshot().time) > -1 ? times.indexOf(tickerApi.getCurrentSnapshot().time) : 0);
+    const [timeValue, setTimeValue] = useState(0);
 
-    const [selectedPlayType, setSelectedPlayType] = useState("realtime")
+    const [uiTimeFrame, setUITimeFrame] = useState<UIResolution>("realtime")
     const style = useStyle(theme)
     const [, forceUpdate] = useReducer(x => x + 1, 0);
 
+    useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot: Snapshot) => {
+        console.log('snapshot,snapshot', snapshot)
+        setPreTimeValue(timeValue)
+        setTimeValue(times.indexOf(snapshot.time))
+        setPreDateValue(dateValue)
+        setDateValue(snapshot.date)
+        forceUpdate()
+    })
+
     useEffect(() => {
+        Storage.getKeyAsync('preferred_ui_timeframe').then((t) => {
+            setUITimeFrame(t as UIResolution || "realtime")
+        })
+        tickerApi.getTimeFrames().then(setTimes)
+
         tickerApi.
             getAvailableSymbols()
             .then((symbols) => {
@@ -41,13 +56,40 @@ export function TimeTravel() {
                 const _dates = Array.from(dates)
                 setDates(_dates)
                 const _times = Array.from(times).sort()
-                setTimes(_times)
+                // setTimes(_times)
                 // if (_dates.length > 0) {
                 //     setPreDateValue(_dates[0])
                 //     setDateValue(_dates[_dates.length - 1])
                 // }
             })
     }, [])
+
+    if (tickerApi.isPlaying()) {
+
+        return (
+            <Center>
+                <TextView>{dateValue}</TextView>
+                <TitleText>{times[timeValue]}</TitleText>
+                <Caption>{tickerApi.getCurrentSnapshot().ticks[0]?.datetime}</Caption>
+                <ButtonView
+                    underlayColor={theme.colors.critical}
+                    style={{
+                        backgroundColor: theme.colors.critical
+                    }}
+                    onPress={async () => {
+                        await tickerApi.stopSeek()
+                        forceUpdate()
+                    }}>
+                    <Center style={{
+                        flexDirection: 'row'
+                    }}>
+                        <Icon name="pause" />
+                    </Center>
+                </ButtonView>
+            </Center>
+        )
+
+    }
     return (
         <VBox>
             <Center style={{
@@ -77,7 +119,7 @@ export function TimeTravel() {
                     <Title style={{
                         color: theme.colors.caption
                     }}>
-                        {parseTime(times[prevsliderValue])}
+                        {parseTime(times[prevTimeValue])}
                     </Title>
                 </Center>
                 <Icon name="arrow-right" style={{
@@ -104,7 +146,7 @@ export function TimeTravel() {
                             title: d
                         }))} selectedId={dateValue} onSelect={setDateValue} />
                     <Title>
-                        {parseTime(times[sliderValue])}
+                        {parseTime(times[timeValue])}
                     </Title>
                 </Center>
             </Center>
@@ -115,98 +157,99 @@ export function TimeTravel() {
                 }}
                 minimumValue={0}
                 maximumValue={times.length - 1}
-                value={sliderValue}
-                onValueChange={setSliderValue}
+                value={timeValue}
+                onValueChange={setTimeValue}
             />
 
-            <DropDownView
-                style={{
-                    margin: 0,
-                    padding: 0,
-                }}
-                onSelect={(id) => {
-                    tickerApi.uiTimeframe = id as any
-                    setSelectedPlayType(id)
-                }}
-                selectedId={selectedPlayType}
-                title="Play type in UI"
-                options={[{
-                    id: 'realtime',
-                    value: 'realtime',
-                    title: 'Realtime'
-                },
-                {
-                    id: 'minute',
-                    value: 'minute',
-                    title: 'Minute by Minute'
-                },
-                {
-                    id: 'fastforward',
-                    value: 'fastforward',
-                    title: 'Fast forward'
-                }]} />
 
-            <Center style={{
-                flex: 1,
-                marginRight: theme.dimens.space.sm,
-                marginLeft: theme.dimens.space.sm,
-                flexDirection: 'row'
-            }}>
-                {
-                    tickerApi.isPlaying() ? (
-                        <ButtonView icon="pause" text="Pause" onPress={() => {
-                            tickerApi.stopSeek()
-                            forceUpdate()
-                        }} />
-                    ) : (
-                        <>
+
+            {
+                (prevTimeValue != timeValue || preDateValue != dateValue) && (
+
+                    <>
+                        <DropDownView
+                            style={{
+                                margin: 0,
+                                padding: 0,
+                            }}
+                            onSelect={(id) => {
+                                tickerApi.uiTimeframe = id as any
+                                setUITimeFrame(id as UIResolution)
+                                Storage.setKeyAsync('preferred_ui_timeframe', id)
+                            }}
+                            selectedId={uiTimeFrame}
+                            title="Play type in UI"
+                            options={[{
+                                id: 'realtime',
+                                value: 'realtime',
+                                title: 'Realtime'
+                            },
+                            {
+                                id: 'minute',
+                                value: 'minute',
+                                title: 'Minute by Minute'
+                            },
+                            {
+                                id: 'fastforward',
+                                value: 'fastforward',
+                                title: 'Fast forward'
+                            }]} />
+                        <Center style={{
+                            flex: 1,
+                            marginRight: theme.dimens.space.sm,
+                            marginLeft: theme.dimens.space.sm,
+                            flexDirection: 'row'
+                        }}>
                             <ButtonView
                                 style={{
                                     width: '50%'
                                 }}
                                 onPress={() => {
-                                    if ((sliderValue) < (prevsliderValue)) {
-                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[sliderValue]).then(snapshot => {
+                                    if ((timeValue) < (prevTimeValue)) {
+                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[timeValue]).then(snapshot => {
                                             publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
                                         })
                                     } else {
-                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[sliderValue]).then(snapshot => {
+                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[timeValue]).then(snapshot => {
                                             publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
                                         })
                                     }
-                                    setPreSliderValue(sliderValue)
+                                    setPreTimeValue(timeValue)
                                 }}>Seek</ButtonView>
                             <ButtonView
-                                disabled={(sliderValue) < (prevsliderValue)}
+                                disabled={(timeValue) < (prevTimeValue)}
                                 style={{
                                     width: '50%',
                                     backgroundColor: (
-                                        (sliderValue) < (prevsliderValue) ? theme.colors.caption : theme.colors.accent
+                                        (timeValue) < (prevTimeValue) ? theme.colors.caption : theme.colors.accent
                                     )
                                 }}
                                 onPress={() => {
-                                    tickerApi.seekForward(tickerApi.getCurrentSnapshot().date, times[sliderValue], false).then(snapshot => {
-                                        publishEvent(Topic.SNAPSHOT_UPDATE, true)
-                                    })
-                                    setPreSliderValue(sliderValue)
+                                    tickerApi.uiTimeframe = uiTimeFrame
+                                    tickerApi.seekForward(dateValue, times[timeValue])
+                                    setPreTimeValue(timeValue)
+                                    forceUpdate()
                                 }}>Play</ButtonView>
-                        </>
-                    )
-                }
-            </Center>
 
-            <Caption style={{
-                marginRight: 0,
-                marginLeft: 0
-            }}>
-                With Seek, You can directly jump to the specified time. It does not read the data in between and and just pulls out the data at the end of the seeked minute. You orders will not get triggered.
-            </Caption>
-            <Caption style={{
-                marginRight: 0,
-                marginLeft: 0
-            }}>
-                With Play, Each tick will be processed and orders if any will get triggered. You can choose to watch the data in UI minute by minute or directly jump using fast forward. You cannot play while travelling back in time.
-            </Caption>
+                        </Center>
+
+
+
+                        <Caption style={{
+                            marginRight: 0,
+                            marginLeft: 0
+                        }}>
+                            With Seek, You can directly jump to the specified time. It does not read the data in between and and just pulls out the data at the end of the seeked minute. You orders will not get triggered.
+                        </Caption>
+                        <Caption style={{
+                            marginRight: 0,
+                            marginLeft: 0
+                        }}>
+                            With Play, Each tick will be processed and orders if any will get triggered. You can choose to watch the data in UI minute by minute or directly jump using fast forward. You cannot play while travelling back in time.
+                        </Caption>
+                    </>
+                )
+            }
         </VBox>
     )
 }
