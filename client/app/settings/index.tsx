@@ -1,15 +1,15 @@
-import { BottomSheet, ButtonView, Caption, CardView, CompositeTextInputView, Expand, HBox, KeyboardAvoidingScrollView, PressableView, ProgressBarView, Spinner, Storage, Subtitle, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
+import { BottomSheet, ButtonView, Caption, CardView, CompositeTextInputView, DropDownView, Expand, HBox, KeyboardAvoidingScrollView, LoadingButton, PressableView, ProgressBarView, Spinner, Storage, Subtitle, SwitchView, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
 import { useStyle } from "../../components/style";
 import React, { useContext, useEffect, useState } from "react";
 import { Button, FlatList } from "react-native";
 import { FilePicker } from "../../components/filepicker/FilePicker";
-import { useEventListener, useEventPublisher } from "../../components/store";
-import { Topic } from "../../components/EventListeners";
+import { Topic, useEventListener, useEventPublisher } from "../../components/store";
 import { AppContext } from "../../components/AppContext";
 import { Tick } from "../../services/models/Tick";
 import { ReactUtils } from "../../utils/ReactUtils";
-import { MarketDataRow } from "../../services/SqliteTickerApi";
+import { MarketDataRow, SqliteTickerApi } from "../../services/SqliteTickerApi";
 import Checkbox from 'expo-checkbox';
+import { Resolution, TickerApi } from "../../services/TickerApi";
 
 
 export default function Settings() {
@@ -91,7 +91,7 @@ export function MetaData() {
                     }}>
                         <TextView style={{
                             color: theme.colors.accent
-                        }}>Currently selected date is {tickerApi.snapshot?.date} with {tickerApi.symbols.length} instruments selected for paper trading.</TextView>
+                        }}>Currently selected date is {tickerApi.snapshot?.date} with {tickerApi.getSymbols().length} instruments selected for paper trading.</TextView>
                     </PressableView>
                 )
             }
@@ -145,23 +145,22 @@ export function MetaData() {
                 }}
                 title="Select instruments" visible={showSelectSymbols}>
                 <SearchBox
-                    selectedSymbols={tickerApi.symbols || []}
+                    selectedSymbols={tickerApi.getSymbols() || []}
                     symbols={availableSymbols.map(m => m.symbol)}
                     onDone={(symbols) => {
-                        setShowSelectSymbols(false)
-                        tickerApi.symbols = symbols
-                        Storage.setKeyAsync('symbols', JSON.stringify(symbols))
+                        setShowSelectSymbols(false);
+                        Storage.setKeyAsync('symbols', JSON.stringify(symbols));
                         tickerApi.getSnapShot(
                             tickerApi.snapshot.date,
                             '0915'
                         ).then((snap) => {
-
                         }).catch(e => {
-                            setError(e.message)
+                            setError(e.message);
                         }).finally(() => {
-                            setLoading(false)
-                        })
-                    }} />
+                            setLoading(false);
+                        });
+                    }}
+                    tickerApi={tickerApi} />
             </BottomSheet>
         </CardView>
     )
@@ -171,9 +170,11 @@ export function LoadCsv() {
     const theme = useContext(ThemeContext)
     const styles = useStyle(theme)
     const [loadProgress, setLoadProgress] = useState(-1)
+    const { context } = useContext(AppContext)
     const [processComplete, setProcessComplete] = useState<String | undefined>(undefined)
     const [processError, setErocessError] = useState<String | undefined>(undefined)
     const publisher = useEventPublisher()
+    const [clear, setClear] = useState(false)
 
 
     useEventListener(Topic.INGEST_CSV_ERROR, ({ message }) => {
@@ -196,6 +197,14 @@ export function LoadCsv() {
         <CardView key="loadcsv">
             <Subtitle>Load CSV</Subtitle>
             <TextView>Select a file containing the market data. Existing data will be unloaded when you load new data.</TextView>
+            <SwitchView
+                style={{
+                    paddingTop: theme.dimens.space.sm
+                }}
+                text="Clear existing data" value={clear}
+                onChange={(e) => {
+                    setClear(e.nativeEvent.value)
+                }} />
             {
                 processComplete && (
                     <TextView style={{
@@ -223,10 +232,17 @@ export function LoadCsv() {
                         auto={false}
                         text="Select File"
                         onFiles={(files) => {
-                            setProcessComplete(undefined)
-                            setErocessError(undefined)
-                            if (files.length > 0)
-                                publisher(Topic.INGEST_CSV, files[0])
+                            (clear ? (context.tickApi as SqliteTickerApi).clearDb() : Promise.resolve(true))
+                                .then(() => {
+                                    setProcessComplete(undefined)
+                                    setErocessError(undefined)
+                                    if (files.length > 0)
+                                        publisher(Topic.INGEST_CSV, files[0])
+                                })
+                                .catch(e => {
+                                    console.log("Error in clearDb", e)
+                                    setErocessError(e.message)
+                                })
                         }}
                     />
                 )
@@ -236,10 +252,28 @@ export function LoadCsv() {
 }
 
 
-export function SearchBox({ symbols, selectedSymbols, onDone }: { symbols: string[], selectedSymbols: string[], onDone: (syms: string[]) => void }) {
+export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { symbols: string[], tickerApi: TickerApi, selectedSymbols: string[], onDone: (syms: string[]) => void }) {
     const [searchText, setSearchText] = useState('');
     const [selected, setSelected] = useState<string[]>([...selectedSymbols]);
     const theme = useContext(ThemeContext)
+    const resolutions = ["realtime", "1s", "10s", "1m", "10m"]
+    const [resolution, setResolution] = useState<Resolution>("realtime")
+    const [loading, setLoading] = useState(false)
+
+
+    const [loadProgress, setLoadProgress] = useState(-1)
+    const [processComplete, setProcessComplete] = useState<String | undefined>(undefined)
+    const [processError, setErocessError] = useState<String | undefined>(undefined)
+    const publisher = useEventPublisher()
+
+    useEffect(() => {
+        Storage.getKeyAsync('preferred_resolution').then(r => {
+            setResolution(r as Resolution || 'realtime')
+        })
+    }, [])
+
+
+
     const filteredSymbols = symbols
         .map(symbol => {
             const symbolLower = symbol.toLowerCase();
@@ -272,8 +306,26 @@ export function SearchBox({ symbols, selectedSymbols, onDone }: { symbols: strin
                 placeholder="Search symbols..."
                 onChangeText={(text) => setSearchText(text)}
             />
+            <DropDownView
+                title="Resolution"
+                options={resolutions.map(op => ({
+                    id: op,
+                    value: op,
+                    title: op
+                }))}
+                selectedId={resolution}
+                onSelect={(g) => {
+                    Storage.setKeyAsync('preferred_resolution', g)
+                    setResolution(g as any)
+                }}
+
+            />
+
             <Caption>
-                Since there are a lot of instruments avaialble in the dataset, select only those symbols that you intend to monitor or paper trade to make sure device performace is not degraded.
+                Realtime resolution processes all ticks but has poor performance while 10 min resolution has best performance but processes ticks from 10 min intervals.
+            </Caption>
+            <Caption>
+                Select only those symbols that you intend to monitor or paper trade for better performance.
             </Caption>
 
             <FlatList
@@ -312,10 +364,41 @@ export function SearchBox({ symbols, selectedSymbols, onDone }: { symbols: strin
                 )}
             />
 
-            <ButtonView
-                onPress={() => onDone(selected)}>
-                Done
-            </ButtonView>
+
+            <LoadingButton
+                style={{
+                    display: loadProgress > -1 ? "none" : "flex"
+                }}
+                text={"Subscribe"}
+                disabled={loading}
+                loading={loading}
+                onPress={() => {
+
+                    setLoading(true)
+                    tickerApi.subscribe(selected, resolution, (p, t) => {
+                        setLoadProgress((p * 100 / t))
+                    })
+                        .catch(e => {
+                            console.log(e)
+                            setErocessError(e.message)
+                        })
+                        .finally(() => {
+                            setLoading(false)
+                            onDone(selected)
+                        })
+                }} />
+            {
+                loadProgress > -1 && (
+                    <ProgressBarView
+                        style={{
+                            marginBottom: theme.dimens.space.lg
+                        }}
+                        progress={loadProgress} />
+                )
+            }
+            {
+                processError && <TextView>{processError}</TextView>
+            }
         </VBox>
     );
 }

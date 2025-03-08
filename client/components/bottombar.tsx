@@ -2,8 +2,7 @@ import { useRootNavigationState, useRouter } from 'expo-router';
 import React, { useContext, useEffect } from 'react';
 
 import { BottomNavBar, ThemeContext } from 'react-native-boxes';
-import { useEventPublisher } from './store';
-import { Topic } from './EventListeners';
+import { Topic, useEventPublisher } from './store';
 
 export default function AppBottomBar() {
   const theme = useContext(ThemeContext)

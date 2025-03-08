@@ -3,8 +3,7 @@ import { useStyle } from '../components/style';
 import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../components/AppContext';
 import { Snapshot } from '../services/TickerApi';
-import { useEventListener } from '../components/store';
-import { Topic } from '../components/EventListeners';
+import { Topic, useEventListener } from '../components/store';
 import { ScipDisplay } from '../components/Instrument';
 import { Tick } from '../services/models/Tick';
 import { PaperbullTimeBar } from '../components/Slider';
@@ -60,7 +59,7 @@ export default function Watchlist() {
         {
           snapshot?.ticks?.map(t => {
             return (
-              <ScipDisplay key={t.symbol} tick={t} prevTick={new Tick({
+              <ScipDisplay key={t.symbol + '' + t.datetime} tick={t} prevTick={new Tick({
                 ...t,
                 last_price: t.last_price - 10
               })} />

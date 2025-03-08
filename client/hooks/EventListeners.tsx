@@ -1,10 +1,11 @@
 import { useContext, useState } from "react"
-import { PickedFile } from "./filepicker/FilePickerProps"
-import { useEventListener, useEventPublisher } from "./store"
-import { AppContext } from "./AppContext"
+import { PickedFile } from "../components/filepicker/FilePickerProps"
+import { Topic, useEventListener, useEventPublisher } from "../components/store"
+import { AppContext } from "../components/AppContext"
 import { SqliteTickerApi } from "../services/SqliteTickerApi"
 import { BottomSheet } from "react-native-boxes"
-import { TimeTravel } from "./TimeTravel"
+import { TimeTravel } from "../components/TimeTravel"
+import { Resolution } from "../services/TickerApi"
 
 export function EventListeners() {
     const [showTimeTravel, setShowTimeTravel] = useState(false)
@@ -24,9 +25,7 @@ export function EventListeners() {
         let sqliteTickerApi = tickerApi as SqliteTickerApi
         await sqliteTickerApi.init()
         console.log('Processing file', file)
-        await sqliteTickerApi.clearDb().catch(e => {
-            console.log("Error dropping clearDb", e)
-        })
+
         sqliteTickerApi.loadFromCsv(file,
             (progress, total) => {
                 publishEvent(Topic.INGEST_CSV_PROGRESS, {
@@ -47,6 +46,31 @@ export function EventListeners() {
             })
     })
 
+
+
+    useEventListener(Topic.SUBSCRIBE, async ({ symbols, resolution }: { symbols: string[], resolution: Resolution }) => {
+        let sqliteTickerApi = tickerApi as SqliteTickerApi
+        await sqliteTickerApi.init()
+
+        sqliteTickerApi.subscribe(symbols, resolution,
+            (progress, total) => {
+                publishEvent(Topic.SUBSCRIBE_PROGRESS, {
+                    progress,
+                    total
+                })
+            }, (onCancel) => {
+                setIngestCsvCancel(() => onCancel)
+            })
+            .then(() => {
+
+            })
+            .catch(e => {
+                publishEvent(Topic.SUBSCRIBE_ERROR, {
+                    message: 'Error subscribing market data. ' + e.message
+                })
+            })
+    })
+
     return (
         <BottomSheet
             title="Time Travel"
@@ -56,14 +80,4 @@ export function EventListeners() {
             <TimeTravel />
         </BottomSheet>
     )
-}
-
-
-export const Topic = {
-    TIME_TRAVEL: 'TIME_TRAVEL',
-    SNAPSHOT_UPDATE: 'SNAPSHOT_UPDATE',
-    INGEST_CSV: 'INGEST_CSV',
-    INGEST_CSV_PROGRESS: 'INGEST_CSV_PROGRESS',
-    INGEST_CSV_ERROR: 'INGEST_CSV_ERROR',
-    INGEST_CSV_CANCEL: 'INGEST_CSV_CANCEL',
 }

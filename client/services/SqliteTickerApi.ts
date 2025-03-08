@@ -1,13 +1,20 @@
 import { SQLiteDatabase } from 'expo-sqlite';
-import * as SQLite from 'expo-sqlite';
-import { Snapshot, TickerApi } from './TickerApi';
 import * as FileSystem from 'expo-file-system';
+import * as SQLite from 'expo-sqlite';
+
+
+import { Resolution, Snapshot, TickerApi } from './TickerApi';
 import { PickedFile } from '../components/filepicker/FilePickerProps';
 import { Tick } from './models/Tick';
+import { batch } from 'react-redux';
 
 const CHUNK_SIZE = 512 * 1024; // 64KB chunks
 const BATCH_SIZE = 200;    // Number of records per insert batch
-const TABLE_NAME = 'market_data'
+
+const TABLE_MARKET_DATA_FULL = 'market_data'
+const TABLE_SYMBOL_CACHE = 'symbol_cache'
+const TABLE_MARKET_DATA_RUNTIME = 'market_data_runtime'
+
 export type MarketDataRow = {
     symbol: string
     datetime: number
@@ -16,16 +23,126 @@ export type MarketDataRow = {
     last_price: number
 }
 export class SqliteTickerApi extends TickerApi {
-    db!: SQLiteDatabase;
+    dbCold!: SQLiteDatabase;
+    dbHot!: SQLiteDatabase;
 
 
-    constructor(timeframe: "realtime" | "1s" | "10s" | "1m" | "10m" = 'realtime') {
+    constructor(timeframe: Resolution = 'realtime') {
         super(timeframe)
     }
 
-    async subscribe(instrumentToken: string[]) {
 
+    async subscribe(
+        instrumentTokens: string[],
+        resolution: "realtime" | "1s" | "10s" | "1m" | "10m",
+        onProgress?: (progress: number, total: number) => void,
+        setCancelHook?: (cancelCallback: () => void) => void
+    ) {
+        await this.dbHot?.execAsync(`DROP TABLE IF EXISTS ${TABLE_MARKET_DATA_RUNTIME}`)
+        await this.createHotMktDataTable()
+        // Save instrument tokens for later reference.
+        this.setSymbols(instrumentTokens);
+        let isCancelled = false;
+        if (setCancelHook) {
+            setCancelHook(() => {
+                console.log("subscription cancelled");
+                isCancelled = true;
+            });
+        }
+
+        // Convert resolution to an interval in milliseconds.
+        let resolutionInterval: number | null = 0;
+        if (resolution !== "realtime") {
+            const unit = resolution.slice(-1);
+            const value = parseInt(resolution);
+            if (unit === "s") {
+                resolutionInterval = value * 1000;
+            } else if (unit === "m") {
+                resolutionInterval = value * 60 * 1000;
+            }
+        }
+
+        // Build the base query with parameter placeholders.
+        const tokensPlaceholder = instrumentTokens.map(() => '?').join(',');
+        const baseQuery = `
+          SELECT symbol, datetime, date, time, last_price 
+          FROM ${TABLE_MARKET_DATA_FULL} 
+          WHERE symbol IN (${tokensPlaceholder})
+          ORDER BY symbol, datetime ASC
+        `;
+
+        // Optionally, get total row count for progress updates.
+        let totalRows = 0;
+        try {
+            const countQuery = `
+            SELECT COUNT(*) as count 
+            FROM ${TABLE_MARKET_DATA_FULL} 
+            WHERE symbol IN (${tokensPlaceholder})
+          `;
+            const countResult: any[] = await this.dbCold.getAllSync(countQuery, instrumentTokens);
+            totalRows = countResult[0].count;
+        } catch (error) {
+            console.error("Error fetching total count. Progress may not be accurate.", error);
+        }
+
+        let processed = 0;
+        const batchSize = 10000;
+        let offset = 0;
+        // Keep track of the last accepted datetime for each symbol.
+        const lastCopied: { [symbol: string]: number } = {};
+
+        // Process the data in batches.
+        while (!isCancelled) {
+            const batchQuery = `${baseQuery} LIMIT ${batchSize} OFFSET ${offset}`;
+            const batch: any[] = await this.dbCold.getAllSync(batchQuery, instrumentTokens);
+            if (batch.length === 0) {
+                break;
+            }
+            const toInsertBatch: any[] = [];
+
+            for (const row of batch) {
+                if (isCancelled) {
+                    console.log("Operation cancelled. Exiting subscription loop.");
+                    break;
+                }
+
+                const symbol = row.symbol;
+                // Apply resolution filtering if needed.
+                if (resolutionInterval !== null) {
+                    const lastTime = lastCopied[symbol] || 0;
+                    if (row.datetime - lastTime < resolutionInterval) {
+                        processed++;
+                        continue;
+                    }
+                    lastCopied[symbol] = row.datetime;
+                }
+
+                // Insert the row into the runtime (hot) database.
+                toInsertBatch.push(row);
+
+
+                processed++;
+
+            }
+            if (toInsertBatch.length > 0) {
+                const placeholders = toInsertBatch.map(() => '(?, ?, ?, ?, ?)').join(',');
+                const sql = `INSERT INTO ${TABLE_MARKET_DATA_RUNTIME} (symbol, datetime, date, time, last_price) VALUES ${placeholders}`;
+                const params = toInsertBatch.flatMap(record => [
+                    record.symbol,
+                    record.datetime,
+                    record.date,
+                    record.time,
+                    record.last_price,
+                ]);
+                await this.dbHot.runAsync(sql, params);
+            }
+
+            if (onProgress) onProgress(processed, totalRows);
+            if (batch.length < batchSize) break;
+            offset += batchSize;
+        }
     }
+
 
     async listen(onTick: (ticks: Tick[]) => void) {
 
@@ -41,37 +158,39 @@ export class SqliteTickerApi extends TickerApi {
     }
 
     async clearDb() {
-
-        await this.db?.execAsync(`DELETE from symbol_cache WHERE 1 = 1`)
-        return this.db?.execAsync(`DROP TABLE IF EXISTS ${TABLE_NAME}`)
+        await this.dbHot?.execAsync(`DELETE from symbol_cache WHERE 1 = 1`)
+        return Promise.all([
+            this.dbCold?.execAsync(`DROP TABLE IF EXISTS ${TABLE_MARKET_DATA_FULL}`),
+            this.dbHot?.execAsync(`DROP TABLE IF EXISTS ${TABLE_MARKET_DATA_RUNTIME}`)
+        ])
     }
 
     async getDataSize(date?: string, time?: string): Promise<number> {
-        let query = `SELECT count(*) as cnt FROM ${TABLE_NAME} m `;
+        let query = `SELECT count(*) as cnt FROM ${TABLE_MARKET_DATA_FULL} m `;
         if (date) {
             query = query + `WHERE date = '${date}'`
         }
         if (time) {
             query = query + ` AND date = '${time}'`
         }
-        const result: any = await this.db.getFirstAsync(query);
+        const result: any = await this.dbCold.getFirstAsync(query);
         return result.cnt;
     }
     private async getFromCache(date?: string): Promise<MarketDataRow[]> {
         const query = date
             ? `SELECT * FROM symbol_cache WHERE date = ?;`
             : `SELECT * FROM symbol_cache;`;
-        const result: MarketDataRow[] = await this.db.getAllAsync(query, date ? [date] : []);
+        const result: MarketDataRow[] = await this.dbHot.getAllAsync(query, date ? [date] : []);
         return result
     }
 
     private async updateCache(rows: MarketDataRow[]): Promise<void> {
         const query = `
-        INSERT OR REPLACE INTO symbol_cache (symbol, datetime, date, time, last_price)
+        INSERT OR REPLACE INTO ${TABLE_SYMBOL_CACHE} (symbol, datetime, date, time, last_price)
         VALUES (?, ?, ?, ?, ?);
     `;
         for (const row of rows) {
-            await this.db.runAsync(query, [
+            await this.dbHot.runAsync(query, [
                 row.symbol,
                 row.datetime,
                 row.date,
@@ -99,7 +218,7 @@ export class SqliteTickerApi extends TickerApi {
                     GROUP BY symbol
                 );
         `;
-        const result: MarketDataRow[] = await this.db.getAllAsync(query);
+        const result: MarketDataRow[] = await this.dbCold.getAllAsync(query);
         const ticks = result.map(this.mapDbRowToTick);
         await this.updateCache(result);
 
@@ -115,20 +234,22 @@ export class SqliteTickerApi extends TickerApi {
 
         const placeholders = this.symbols.map(() => '?').join(',');
         let query = `
-            SELECT m.* FROM ${TABLE_NAME} m
-            INNER JOIN (
+            SELECT m.* FROM ${TABLE_MARKET_DATA_RUNTIME} m
+             INNER JOIN (
                 SELECT symbol, MAX(datetime) AS max_datetime
-                FROM ${TABLE_NAME}
+                FROM ${TABLE_MARKET_DATA_RUNTIME}
                 WHERE symbol IN (${placeholders})
-                AND ( date = '${date}' AND time = '${time}')
+                AND ( date = '${date}' AND time <= '${time}')
                 GROUP BY symbol
             ) latest 
             ON m.symbol = latest.symbol 
             AND m.datetime = latest.max_datetime
         `;
 
-        const result: any = await this.db.getAllAsync(query, this.symbols);
-        console.log(query, this.symbols, result)
+        const result: any = await this.dbHot.getAllAsync(query, this.symbols);
+        console.log(query, this.symbols)
+        console.log('result==>', result)
+
         let ticks = result.map(this.mapDbRowToTick);
         let snapshot = {
             date,
@@ -144,11 +265,14 @@ export class SqliteTickerApi extends TickerApi {
     }
 
     async init() {
-        if (!this.db) {
-            this.db = await SQLite.openDatabaseAsync('market_data.sqlite');
+        if (!this.dbCold) {
+            this.dbCold = await SQLite.openDatabaseAsync('market_data.sqlite');
+            this.dbHot = await SQLite.openDatabaseAsync('market_data_runtime.sqlite');
             await this.createCacheTableIfNotExists()
-            await this.createTable()
-            await this.createIndex()
+            await this.createFullMktDataTable()
+            await this.createHotMktDataTable()
+            await this.createFullMktIndex()
+            await this.createHotMktIndex()
         }
     }
 
@@ -162,7 +286,7 @@ export class SqliteTickerApi extends TickerApi {
             isCancelled = true
         })
         const path = file.uri
-        await this.createTable()
+        await this.createFullMktDataTable()
         console.log('Loading CSV from ', path)
 
         const fileInfo = await FileSystem.getInfoAsync(path);
@@ -267,12 +391,23 @@ export class SqliteTickerApi extends TickerApi {
             record.last_price,
         ]);
 
-        await this.db.runAsync(sql, params);
+        await this.dbCold.runAsync(sql, params);
     }
 
-    async createTable() {
-        await this.db.execAsync(`
-            CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
+    async createFullMktDataTable() {
+        await this.dbCold.execAsync(`
+            CREATE TABLE IF NOT EXISTS ${TABLE_MARKET_DATA_FULL} (
+                symbol TEXT,
+                datetime INTEGER,
+                date TEXT,
+                time TEXT,
+                last_price REAL
+            );
+        `);
+    }
+    async createHotMktDataTable() {
+        await this.dbHot.execAsync(`
+            CREATE TABLE IF NOT EXISTS ${TABLE_MARKET_DATA_RUNTIME} (
                 symbol TEXT,
                 datetime INTEGER,
                 date TEXT,
@@ -282,8 +417,8 @@ export class SqliteTickerApi extends TickerApi {
         `);
     }
     private async createCacheTableIfNotExists() {
-        await this.db.execAsync(`
-            CREATE TABLE IF NOT EXISTS symbol_cache (
+        await this.dbHot.execAsync(`
+            CREATE TABLE IF NOT EXISTS ${TABLE_SYMBOL_CACHE} (
                 symbol TEXT,
                 datetime INTEGER,
                 date TEXT,
@@ -292,9 +427,14 @@ export class SqliteTickerApi extends TickerApi {
             );
         `);
     }
-    async createIndex() {
-        await this.db.execAsync(`
-            CREATE INDEX idx_symbol_date_time_${TABLE_NAME} ON users(symbol, date, time);
+    async createFullMktIndex() {
+        await this.dbCold.execAsync(`
+            CREATE INDEX idx_symbol_date_time_${TABLE_MARKET_DATA_FULL} ON users(symbol, date, time);
+        `)
+    }
+    async createHotMktIndex() {
+        await this.dbHot.execAsync(`
+            CREATE INDEX idx_symbol_date_time_${TABLE_MARKET_DATA_RUNTIME} ON users(symbol, date, time);
         `)
     }
 }

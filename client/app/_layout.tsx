@@ -9,7 +9,7 @@ import { Colors, DarkColors, Storage, Theme, ThemeContext } from 'react-native-b
 import AppBottomBar from '../components/bottombar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppContext, Context } from '../components/AppContext';
-import { EventListeners } from '../components/EventListeners';
+import { EventListeners } from '../hooks/EventListeners';
 import { Provider } from 'react-redux';
 import { store } from '../components/store';
 import { SqliteTickerApi } from '../services/SqliteTickerApi';
@@ -33,7 +33,7 @@ export default function RootLayout() {
     })
     Storage.getKeyAsync('symbols').then(symbols => {
       if (symbols) {
-        tickerApi.symbols = JSON.parse(symbols)
+        tickerApi.setSymbols(JSON.parse(symbols))
       }
     })
     tickerApi.init().finally(() => {

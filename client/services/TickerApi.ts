@@ -7,20 +7,26 @@ export type Snapshot = {
     ticks: Tick[]
 }
 
-
+export type Resolution = "realtime" | "1s" | "10s" | "1m" | "10m"
+export type UIResolution = "realtime" | "minute" | "fastforward"
 export class TickerApi {
     snapshotPrev: Snapshot = {} as Snapshot
     snapshot: Snapshot = {} as Snapshot
-    symbols: string[] = [];
+    protected symbols: string[] = [];
     currentListenCallback: ((ticks: Tick[]) => void) | null = null;
-    timeframe: "realtime" | "1s" | "10s" | "1m" | "10m"
-    uiTimeframe: "realtime" | "minute" | "fastforward"
+    protected timeframe: Resolution
+    uiTimeframe: UIResolution
 
-    constructor(timeframe: "realtime" | "1s" | "10s" | "1m" | "10m" = 'realtime') {
+    constructor(timeframe: Resolution = 'realtime') {
         this.timeframe = timeframe
         this.uiTimeframe = "realtime"
     }
 
+    async setSymbols(
+        instrumentTokens: string[]) {
+        this.symbols = instrumentTokens;
+
+    }
     async getTimeFrames(): Promise<string[]> {
         const startTime = "0900";
         const endTime = "1530";
@@ -54,8 +60,17 @@ export class TickerApi {
         return `${hoursString}${minutesString}`;
     }
 
-    async subscribe(instrumentToken: string[]) {
 
+    async subscribe(
+        instrumentTokens: string[],
+        resolution: Resolution,
+        onProgress?: (progress: number, total: number) => void,
+        setCancelHook?: (cancelCallback: () => void) => void) {
+        this.symbols = instrumentTokens
+    }
+
+    getSymbols() {
+        return this.symbols
     }
 
     async listen(onTick: (ticks: Tick[]) => void) {
