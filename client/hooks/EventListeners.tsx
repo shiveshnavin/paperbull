@@ -51,11 +51,13 @@ export function EventListeners() {
                     }
                     else {
                         curFrameDatetimems = tick.datetime
-                        publishEvent(Topic.SNAPSHOT_UPDATE, {
+                        let snap = {
                             date: tick.getDate(),
                             time: tick.getTime(),
                             ticks: Array.from(frame.values())
-                        } as Snapshot)
+                        } as Snapshot
+                        publishEvent(Topic.SNAPSHOT_UPDATE, snap)
+                        tickerApi.setSnapshot(snap)
                     }
                 }
 

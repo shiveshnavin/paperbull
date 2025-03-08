@@ -302,25 +302,31 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { sym
 
     return (
         <VBox>
-            <CompositeTextInputView
-                placeholder="Search symbols..."
-                onChangeText={(text) => setSearchText(text)}
-            />
-            <DropDownView
-                title="Resolution"
-                options={resolutions.map(op => ({
-                    id: op,
-                    value: op,
-                    title: op
-                }))}
-                selectedId={resolution}
-                onSelect={(g) => {
-                    Storage.setKeyAsync('preferred_resolution', g)
-                    setResolution(g as any)
-                }}
 
-            />
+            {
+                loadProgress == -1 && (
+                    <>
+                        <CompositeTextInputView
+                            placeholder="Search symbols..."
+                            onChangeText={(text) => setSearchText(text)}
+                        />
+                        <DropDownView
+                            title="Resolution"
+                            options={resolutions.map(op => ({
+                                id: op,
+                                value: op,
+                                title: op
+                            }))}
+                            selectedId={resolution}
+                            onSelect={(g) => {
+                                Storage.setKeyAsync('preferred_resolution', g)
+                                setResolution(g as any)
+                            }}
 
+                        />
+                    </>
+                )
+            }
             <Caption>
                 Realtime resolution processes all ticks but has poor performance while 10 min resolution has best performance but processes ticks from 10 min intervals.
             </Caption>
@@ -328,42 +334,44 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { sym
                 Select only those symbols that you intend to monitor or paper trade for better performance.
             </Caption>
 
-            <FlatList
-                showsVerticalScrollIndicator={false}
-                style={{
-                    maxHeight: 250,
-                    marginBottom: theme.dimens.space.md
-                }}
-                data={searchText ? filteredSymbols : selectedSymbols}
-                renderItem={({ item }) => (
-                    <VBox key={item}>
-                        <PressableView onPress={() => toggleSelection(item)}>
-                            <HBox style={{
-                                alignItems: 'center',
-                                overflow: 'hidden',
-                                width: '100%',
-                            }}>
-                                <Checkbox
-                                    style={{
-                                        margin: theme.dimens.space.sm,
-                                    }}
-                                    value={selected.some(s => s === item)}
-                                    onValueChange={() => toggleSelection(item)}
-                                />
-                                <TextView style={{
-                                    flexGrow: 1,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    paddingRight: theme.dimens.space.md
-                                }}>
-                                    {item?.split("-")[0]}
-                                </TextView>
-                            </HBox>
-                        </PressableView>
-                    </VBox>
+            {
+                loadProgress == -1 && (
+                    <FlatList
+                        showsVerticalScrollIndicator={false}
+                        style={{
+                            maxHeight: 250,
+                            marginBottom: theme.dimens.space.md
+                        }}
+                        data={searchText ? filteredSymbols : selectedSymbols}
+                        renderItem={({ item }) => (
+                            <VBox key={item}>
+                                <PressableView onPress={() => toggleSelection(item)}>
+                                    <HBox style={{
+                                        alignItems: 'center',
+                                        overflow: 'hidden',
+                                        width: '100%',
+                                    }}>
+                                        <Checkbox
+                                            style={{
+                                                margin: theme.dimens.space.sm,
+                                            }}
+                                            value={selected.some(s => s === item)}
+                                            onValueChange={() => toggleSelection(item)}
+                                        />
+                                        <TextView style={{
+                                            flexGrow: 1,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            paddingRight: theme.dimens.space.md
+                                        }}>
+                                            {item?.split("-")[0]}
+                                        </TextView>
+                                    </HBox>
+                                </PressableView>
+                            </VBox>
+                        )}
+                    />
                 )}
-            />
-
 
             <LoadingButton
                 style={{

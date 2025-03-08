@@ -1,5 +1,5 @@
 import { useContext, useEffect, useReducer, useState } from "react";
-import { ButtonView, Caption, Center, DropDownView, HBox, Icon, PressableView, Storage, TextView, Title, TitleText, TransparentButton, VBox } from "react-native-boxes";
+import { ButtonView, Caption, Center, DropDownView, HBox, Icon, PressableView, Spinner, Storage, TextView, Title, TitleText, TransparentButton, VBox } from "react-native-boxes";
 import { AppContext } from "./AppContext";
 import { Button, FlatList } from "react-native";
 import { Topic, useEventListener, useEventPublisher } from "./store";
@@ -23,14 +23,15 @@ export function TimeTravel() {
     const [dateValue, setDateValue] = useState(tickerApi.getCurrentSnapshot().date);
 
     const [prevTimeValue, setPreTimeValue] = useState(times.indexOf(tickerApi.getCurrentSnapshot().time) > -1 ? times.indexOf(tickerApi.getCurrentSnapshot().time) : 0);
-    const [timeValue, setTimeValue] = useState(0);
+    const [timeValue, setTimeValue] = useState(times.indexOf(tickerApi.getCurrentSnapshot().time) > -1 ? times.indexOf(tickerApi.getCurrentSnapshot().time) : 0);
 
     const [uiTimeFrame, setUITimeFrame] = useState<UIResolution>("realtime")
     const style = useStyle(theme)
     const [, forceUpdate] = useReducer(x => x + 1, 0);
 
     useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot: Snapshot) => {
-        console.log('snapshot,snapshot', snapshot)
+        // console.log('snapshot,snapshot', snapshot)
+        console.log('tikcer,snapshot', tickerApi.getCurrentSnapshot())
         setPreTimeValue(timeValue)
         setTimeValue(times.indexOf(snapshot.time))
         setPreDateValue(dateValue)
@@ -64,13 +65,20 @@ export function TimeTravel() {
             })
     }, [])
 
+    if (times.length == 0) {
+        return <Center style={{
+            height: theme.dimens.space.xl * 2
+        }}>
+            <Spinner size="large" />
+        </Center>
+    }
+
     if (tickerApi.isPlaying()) {
 
         return (
             <Center>
-                <TextView>{dateValue}</TextView>
-                <TitleText>{times[timeValue]}</TitleText>
-                <Caption>{tickerApi.getCurrentSnapshot().ticks[0]?.datetime}</Caption>
+                <Caption>{dateValue}</Caption>
+                <Title>{parseTime(times[timeValue])}</Title>
                 <ButtonView
                     underlayColor={theme.colors.critical}
                     style={{

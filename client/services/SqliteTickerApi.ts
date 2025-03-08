@@ -83,7 +83,7 @@ export class SqliteTickerApi extends TickerApi {
         }
 
         let processed = 0;
-        const batchSize = 10000;
+        const batchSize = 1000;
         let offset = 0;
         // Keep track of the last accepted datetime for each symbol.
         const lastCopied: { [symbol: string]: number } = {};
@@ -111,6 +111,7 @@ export class SqliteTickerApi extends TickerApi {
                     const lastTime = lastCopied[symbol] || 0;
                     if (row.datetime - lastTime < resolutionInterval) {
                         processed++;
+                        if (onProgress) onProgress(processed, totalRows);
                         continue;
                     }
                     lastCopied[symbol] = row.datetime;
@@ -120,6 +121,7 @@ export class SqliteTickerApi extends TickerApi {
                 toInsertBatch.push(row);
 
 
+                if (onProgress) onProgress(processed, totalRows);
                 processed++;
 
             }
@@ -175,10 +177,9 @@ export class SqliteTickerApi extends TickerApi {
             let dum2 = new Tick({
                 datetime: datetimeto
             })
-            console.log('query', dum.getTime(), dum2.getTime(), query)
-            const params = [datetimefrom, datetimeto, batchSize, offset];
+            // console.log('query', dum.getTime(), dum2.getTime(), query)
 
-            const result: any = await this.dbHot.getAllAsync(query);//, params
+            const result: any = await this.dbHot.getAllAsync(query);
             let ticks = result.map(this.mapDbRowToTick);
             await onTick(ticks);
             if (ticks.length === 0) break;

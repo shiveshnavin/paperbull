@@ -45,7 +45,7 @@ export default function RootLayout() {
     })
     tickerApi.init().finally(() => {
       setApiInit(true);
-      (tickerApi as SqliteTickerApi).test()
+      // (tickerApi as SqliteTickerApi).test()
     })
     ctx.tickApi = tickerApi
     return ctx

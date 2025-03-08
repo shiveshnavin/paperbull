@@ -27,7 +27,7 @@ export function ScipDisplay(props: {
                 }}>
                     <TextView style={{
                         color: change >= 0 ? theme.colors.success : theme.colors.critical,
-                    }}>{props.tick.last_price}</TextView>
+                    }}>{props.tick.last_price?.toFixed(2)}</TextView>
                     <Caption>{changeSymbol}{change}  ({changeSymbol}{changePer.toFixed(2)})</Caption>
                 </VBox>
             </HBox>
