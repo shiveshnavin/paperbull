@@ -6,7 +6,6 @@ import * as SQLite from 'expo-sqlite';
 import { Resolution, Snapshot, TickerApi } from './TickerApi';
 import { PickedFile } from '../components/filepicker/FilePickerProps';
 import { Tick } from './models/Tick';
-import { batch } from 'react-redux';
 
 const CHUNK_SIZE = 512 * 1024; // 64KB chunks
 const BATCH_SIZE = 200;    // Number of records per insert batch
@@ -26,11 +25,9 @@ export class SqliteTickerApi extends TickerApi {
     dbCold!: SQLiteDatabase;
     dbHot!: SQLiteDatabase;
 
-
     constructor(timeframe: Resolution = 'realtime') {
         super(timeframe)
     }
-
 
     async subscribe(
         instrumentTokens: string[],
@@ -143,18 +140,8 @@ export class SqliteTickerApi extends TickerApi {
         }
     }
 
-
     async listen(onTick: (ticks: Tick[]) => void) {
-
-    }
-
-    async seekForward(date: string, time: string, processIntermediates = true): Promise<Tick[]> {
-        // calls the onTick function with the ticks with timeframe sampling
-        return (await this.getSnapShot(date, time)).ticks
-    }
-
-    async seekBack(date: string, time: string): Promise<Tick[]> {
-        return (await this.getSnapShot(date, time)).ticks
+        super.listen(onTick)
     }
 
     async clearDb() {
