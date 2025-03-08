@@ -19,18 +19,18 @@ export default function Watchlist() {
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
   function fetchSnapShot() {
-    if (tickerApi.snapshot?.date == undefined) {
+    if (tickerApi.getCurrentSnapshot()?.date == undefined) {
       setError('Please select a date from settings.')
       return
     } else {
       setError(undefined)
-      tickerApi.getSnapShot(tickerApi.snapshot.date, tickerApi.snapshot.time).then(setSnapshot)
+      tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, tickerApi.getCurrentSnapshot().time).then(setSnapshot)
     }
   }
 
   useEffect(() => {
     fetchSnapShot()
-  }, [tickerApi.snapshot.date, tickerApi.snapshot.time])
+  }, [tickerApi.getCurrentSnapshot()])
 
   useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot) => {
     setSnapshot(snapshot)
@@ -38,7 +38,7 @@ export default function Watchlist() {
   return (
     <VPage style={styles.container}>
       <PaperbullToolbar
-        time={parseTime(tickerApi.snapshot.time)}
+        time={parseTime(tickerApi.getCurrentSnapshot().time)}
 
         title="Watchlist"
 

@@ -140,16 +140,45 @@ export class SqliteTickerApi extends TickerApi {
         }
     }
 
-    async listen(onTick: (ticks: Tick[]) => void) {
-        super.listen(onTick)
-    }
-
     async clearDb() {
         await this.dbHot?.execAsync(`DELETE from symbol_cache WHERE 1 = 1`)
         return Promise.all([
             this.dbCold?.execAsync(`DROP TABLE IF EXISTS ${TABLE_MARKET_DATA_FULL}`),
             this.dbHot?.execAsync(`DROP TABLE IF EXISTS ${TABLE_MARKET_DATA_RUNTIME}`)
         ])
+    }
+
+    async getTicks(datetimefrom: number, datetimeto: number, onTick: (ticks: Tick[]) => Promise<void>)
+        : Promise<number> {
+
+
+        const batchSize = 100; // Define batch size
+        let offset = 0;
+        let totalFetched = 0;
+
+        while (true) {
+            const query = `
+            SELECT * FROM ${TABLE_MARKET_DATA_RUNTIME} 
+            WHERE (datetime >= ? )
+            AND (date < ? )
+            ORDER BY datetime ASC
+            LIMIT ? OFFSET ?
+        `;
+
+            const params = [datetimefrom, datetimeto, batchSize, offset];
+
+            const result: any = await this.dbHot.getAllAsync(query, params);
+            let ticks = result.map(this.mapDbRowToTick);
+
+            if (ticks.length === 0) break;
+
+            await onTick(ticks);
+            totalFetched += ticks.length;
+            offset += batchSize;
+        }
+
+        return totalFetched;
+
     }
 
     async getDataSize(date?: string, time?: string): Promise<number> {
@@ -213,9 +242,9 @@ export class SqliteTickerApi extends TickerApi {
     }
 
     async getSnapShot(date: string, time: string): Promise<Snapshot> {
-        if (this.snapshot?.date == date
+        if ((this.snapshot?.date == date
             && this.snapshot.time == time
-            && this.snapshot.ticks?.length > 0) {
+            && this.snapshot.ticks?.length > 0)) {
             return this.snapshot
         }
 

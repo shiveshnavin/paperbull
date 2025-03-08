@@ -85,13 +85,13 @@ export function MetaData() {
                 )
             }
             {
-                tickerApi.snapshot?.date && (
+                tickerApi.getCurrentSnapshot()?.date && (
                     <PressableView onPress={() => {
                         setShowSelectSymbols(true)
                     }}>
                         <TextView style={{
                             color: theme.colors.accent
-                        }}>Currently selected date is {tickerApi.snapshot?.date} with {tickerApi.getSymbols().length} instruments selected for paper trading.</TextView>
+                        }}>Currently selected date is {tickerApi.getCurrentSnapshot()?.date} with {tickerApi.getSymbols().length} instruments selected for paper trading.</TextView>
                     </PressableView>
                 )
             }
@@ -113,12 +113,12 @@ export function MetaData() {
                         return (
                             <PressableView key={`${a}-${idx}`}
                                 onPress={() => {
-                                    tickerApi.snapshot = {
+                                    tickerApi.setSnapshot({
                                         date: a,
                                         ticks: [],
                                         time: '0915'
-                                    }
-                                    Storage.setKeyAsync('snapshot', JSON.stringify(tickerApi.snapshot))
+                                    })
+                                    Storage.setKeyAsync('snapshot', JSON.stringify(tickerApi.getCurrentSnapshot()))
                                     setShowSelectSymbols(true)
                                 }}>
                                 <TitleText style={style.link} >{a}</TitleText>
@@ -151,7 +151,7 @@ export function MetaData() {
                         setShowSelectSymbols(false);
                         Storage.setKeyAsync('symbols', JSON.stringify(symbols));
                         tickerApi.getSnapShot(
-                            tickerApi.snapshot.date,
+                            tickerApi.getCurrentSnapshot().date,
                             '0915'
                         ).then((snap) => {
                         }).catch(e => {

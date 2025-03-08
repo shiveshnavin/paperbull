@@ -18,6 +18,9 @@ function base64ToBlob(base64: string): Blob {
     return new Blob([uintArray], { type: mime });
 }
 export const ReactUtils = {
+    toEpochMs(date: string, time: string) {
+        return new Date(`${date}T${time.slice(0, 2)}:${time.slice(2, 4)}:00.000Z`).getTime()
+    },
 
     getWebOS(): "win" | "mac" | "linux" | "android" | "ios" | "unknown" {
         let os: any = "unknown";

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useReducer, useState } from "react";
 import { ButtonView, Caption, Center, DropDownView, HBox, Icon, PressableView, TextView, Title, TransparentButton, VBox } from "react-native-boxes";
 import { AppContext } from "./AppContext";
 import { Button, FlatList } from "react-native";
@@ -18,14 +18,15 @@ export function TimeTravel() {
     const publishEvent = useEventPublisher()
 
 
-    const [preDateValue, setPreDateValue] = useState(tickerApi.snapshot.date);
-    const [dateValue, setDateValue] = useState(tickerApi.snapshot.date);
+    const [preDateValue, setPreDateValue] = useState(tickerApi.getCurrentSnapshot().date);
+    const [dateValue, setDateValue] = useState(tickerApi.getCurrentSnapshot().date);
 
-    const [prevsliderValue, setPreSliderValue] = useState(times.indexOf(tickerApi.snapshot.time) > -1 ? times.indexOf(tickerApi.snapshot.time) : 0);
+    const [prevsliderValue, setPreSliderValue] = useState(times.indexOf(tickerApi.getCurrentSnapshot().time) > -1 ? times.indexOf(tickerApi.getCurrentSnapshot().time) : 0);
     const [sliderValue, setSliderValue] = useState(0);
 
     const [selectedPlayType, setSelectedPlayType] = useState("realtime")
     const style = useStyle(theme)
+    const [, forceUpdate] = useReducer(x => x + 1, 0);
 
     useEffect(() => {
         tickerApi.
@@ -133,7 +134,8 @@ export function TimeTravel() {
                     id: 'realtime',
                     value: 'realtime',
                     title: 'Realtime'
-                }, {
+                },
+                {
                     id: 'minute',
                     value: 'minute',
                     title: 'Minute by Minute'
@@ -150,36 +152,47 @@ export function TimeTravel() {
                 marginLeft: theme.dimens.space.sm,
                 flexDirection: 'row'
             }}>
-                <ButtonView
-                    style={{
-                        width: '50%'
-                    }}
-                    onPress={() => {
-                        if ((sliderValue) < (prevsliderValue)) {
-                            tickerApi.getSnapShot(tickerApi.snapshot.date, times[sliderValue]).then(snapshot => {
-                                publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
-                            })
-                        } else {
-                            tickerApi.getSnapShot(tickerApi.snapshot.date, times[sliderValue]).then(snapshot => {
-                                publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
-                            })
-                        }
-                        setPreSliderValue(sliderValue)
-                    }}>Seek</ButtonView>
-                <ButtonView
-                    disabled={(sliderValue) < (prevsliderValue)}
-                    style={{
-                        width: '50%',
-                        backgroundColor: (
-                            (sliderValue) < (prevsliderValue) ? theme.colors.caption : theme.colors.accent
-                        )
-                    }}
-                    onPress={() => {
-                        tickerApi.seekForward(tickerApi.snapshot.date, times[sliderValue], false).then(snapshot => {
-                            publishEvent(Topic.SNAPSHOT_UPDATE, true)
-                        })
-                        setPreSliderValue(sliderValue)
-                    }}>Play</ButtonView>
+                {
+                    tickerApi.isPlaying() ? (
+                        <ButtonView icon="pause" text="Pause" onPress={() => {
+                            tickerApi.stopSeek()
+                            forceUpdate()
+                        }} />
+                    ) : (
+                        <>
+                            <ButtonView
+                                style={{
+                                    width: '50%'
+                                }}
+                                onPress={() => {
+                                    if ((sliderValue) < (prevsliderValue)) {
+                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[sliderValue]).then(snapshot => {
+                                            publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
+                                        })
+                                    } else {
+                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[sliderValue]).then(snapshot => {
+                                            publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
+                                        })
+                                    }
+                                    setPreSliderValue(sliderValue)
+                                }}>Seek</ButtonView>
+                            <ButtonView
+                                disabled={(sliderValue) < (prevsliderValue)}
+                                style={{
+                                    width: '50%',
+                                    backgroundColor: (
+                                        (sliderValue) < (prevsliderValue) ? theme.colors.caption : theme.colors.accent
+                                    )
+                                }}
+                                onPress={() => {
+                                    tickerApi.seekForward(tickerApi.getCurrentSnapshot().date, times[sliderValue], false).then(snapshot => {
+                                        publishEvent(Topic.SNAPSHOT_UPDATE, true)
+                                    })
+                                    setPreSliderValue(sliderValue)
+                                }}>Play</ButtonView>
+                        </>
+                    )
+                }
             </Center>
 
             <Caption style={{
