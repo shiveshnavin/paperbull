@@ -57,7 +57,7 @@ export function MetaData() {
                         times.add(s.getTime())
                     })
                     setAvailableDates(Array.from(dates))
-                }),
+                })
         ]).catch(e => {
             setError(e.message)
         }).finally(() => {

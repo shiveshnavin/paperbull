@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { ButtonView, Caption, Center, DropDownView, HBox, Icon, Title, TransparentButton, VBox } from "react-native-boxes";
+import { ButtonView, Caption, Center, DropDownView, HBox, Icon, PressableView, TextView, Title, TransparentButton, VBox } from "react-native-boxes";
 import { AppContext } from "./AppContext";
 import { Button, FlatList } from "react-native";
 import { Topic, useEventPublisher } from "./store";
@@ -12,15 +12,40 @@ export function TimeTravel() {
     const theme = context.theme
     const tickerApi = context.tickApi
     const [times, setTimes] = useState<string[]>([])
+    const [dates, setDates] = useState<string[]>([])
+
     const [enabled, setEnabled] = useState(false)
     const publishEvent = useEventPublisher()
+
+
+    const [preDateValue, setPreDateValue] = useState(tickerApi.snapshot.date);
+    const [dateValue, setDateValue] = useState(tickerApi.snapshot.date);
+
     const [prevsliderValue, setPreSliderValue] = useState(times.indexOf(tickerApi.snapshot.time) > -1 ? times.indexOf(tickerApi.snapshot.time) : 0);
     const [sliderValue, setSliderValue] = useState(0);
+
     const [selectedPlayType, setSelectedPlayType] = useState("realtime")
     const style = useStyle(theme)
 
     useEffect(() => {
-        tickerApi.getTimeFrames().then(setTimes)
+        tickerApi.
+            getAvailableSymbols()
+            .then((symbols) => {
+                let dates = new Set<string>()
+                let times = new Set<string>()
+                symbols.forEach(s => {
+                    dates.add(s.getDate())
+                    times.add(s.getTime())
+                })
+                const _dates = Array.from(dates)
+                setDates(_dates)
+                const _times = Array.from(times).sort()
+                setTimes(_times)
+                // if (_dates.length > 0) {
+                //     setPreDateValue(_dates[0])
+                //     setDateValue(_dates[_dates.length - 1])
+                // }
+            })
     }, [])
     return (
         <VBox>
@@ -28,17 +53,59 @@ export function TimeTravel() {
                 marginTop: theme.dimens.space.lg,
                 flexDirection: 'row'
             }}>
-                <Title style={{
-                    color: theme.colors.caption
+                <Center style={{
+                    alignItems: 'center'
                 }}>
-                    {parseTime(times[prevsliderValue])}
-                </Title>
+                    <DropDownView
+                        title="Current date"
+                        //@ts-ignore
+                        underlayColor={theme.colors.transparent}
+                        style={{
+                            margin: 0,
+                            padding: 0,
+                            width: 120,
+                            color: theme.colors.accent,
+                            backgroundColor: theme.colors.transparent,
+                        }}
+                        displayType={"button"}
+                        options={dates.map(d => ({
+                            id: d,
+                            value: d,
+                            title: d
+                        }))} selectedId={preDateValue} onSelect={setPreDateValue} />
+                    <Title style={{
+                        color: theme.colors.caption
+                    }}>
+                        {parseTime(times[prevsliderValue])}
+                    </Title>
+                </Center>
                 <Icon name="arrow-right" style={{
                     padding: theme.dimens.space.md
                 }} />
-                <Title>
-                    {parseTime(times[sliderValue])}
-                </Title>
+                <Center style={{
+                    alignItems: 'center'
+                }}>
+                    <DropDownView
+                        title="New date"
+                        //@ts-ignore
+                        underlayColor={theme.colors.transparent}
+                        style={{
+                            margin: 0,
+                            padding: 0,
+                            width: 120,
+                            color: theme.colors.accent,
+                            backgroundColor: theme.colors.transparent,
+                        }}
+                        displayType={"button"}
+                        options={dates.map(d => ({
+                            id: d,
+                            value: d,
+                            title: d
+                        }))} selectedId={dateValue} onSelect={setDateValue} />
+                    <Title>
+                        {parseTime(times[sliderValue])}
+                    </Title>
+                </Center>
             </Center>
             <PaperbullTimeBar
                 style={{
