@@ -36,13 +36,16 @@ export default function Watchlist() {
   useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot) => {
     setSnapshot(snapshot)
   })
+  let time = parseTime(tickerApi.getCurrentSnapshot().time)
+  if (tickerApi.getCurrentSnapshot()?.ticks?.length > 0) {
+    let tick = tickerApi.getCurrentSnapshot()?.ticks.sort((b, a) => (a.datetime - b.datetime))[0]
+    time = tick.getTimeFormatted()
+  }
   return (
     <VPage style={styles.container}>
       <PaperbullToolbar
-        time={parseTime(tickerApi.getCurrentSnapshot().time)}
-
+        time={time}
         title="Watchlist"
-
         options={[{
           id: 'refresh',
           icon: 'refresh',

@@ -8,7 +8,7 @@ import { useStyle } from "./style";
 import { Snapshot, UIResolution } from "../services/TickerApi";
 // import Slider from '@react-native-community/slider';
 
-export function TimeTravel() {
+export function TimeTravel({ onDismiss }: any) {
     const { context, setContext } = useContext(AppContext)
     const theme = context.theme
     const tickerApi = context.tickApi
@@ -31,7 +31,7 @@ export function TimeTravel() {
 
     useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot: Snapshot) => {
         // console.log('snapshot,snapshot', snapshot)
-        console.log('tikcer,snapshot', tickerApi.getCurrentSnapshot())
+        // console.log('tikcer,snapshot', tickerApi.getCurrentSnapshot())
         setPreTimeValue(timeValue)
         setTimeValue(times.indexOf(snapshot.time))
         setPreDateValue(dateValue)
@@ -237,6 +237,7 @@ export function TimeTravel() {
                                     tickerApi.seekForward(dateValue, times[timeValue])
                                     setPreTimeValue(timeValue)
                                     forceUpdate()
+                                    onDismiss()
                                 }}>Play</ButtonView>
 
                         </Center>

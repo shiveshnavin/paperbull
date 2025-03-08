@@ -47,7 +47,7 @@ export class TickerApi {
 
     }
     async getTimeFrames(): Promise<string[]> {
-        const startTime = "0900";
+        const startTime = "0915";
         const endTime = "1530";
         return this.generateTimeFrames(startTime, endTime, 60);
     }
@@ -141,14 +141,15 @@ export class TickerApi {
             this.onTick && (await this.onTick([], finaldateTime))
 
         } else if (this.uiTimeframe == 'realtime') {
-            console.log('seek forward!!', curdateTime, '->', finaldateTime)
+            console.log('seek realtime!!', curdateTime, '->', finaldateTime)
             let loadNextMinute = async () => {
 
+                if (this.intervalId == null) {
+                    return
+                }
                 if (curdateTime < finaldateTime) {
-
-                    let nextHit = curdateTime + 100
+                    let nextHit = curdateTime + 1000
                     await this.getTicks(curdateTime, nextHit, async (ticks) => {
-                        console.log('ticks', ticks.length)
                         this.onTick && (await this.onTick(ticks, nextHit))
                     }).catch(this.onError)
                     curdateTime = nextHit
@@ -158,15 +159,20 @@ export class TickerApi {
                     this.onTick && (await this.onTick([], finaldateTime))
                 }
             }
+            this.intervalId = 1
             loadNextMinute()
 
         } else if (this.uiTimeframe == 'minute') {
             let loadNextMinute = async () => {
+
+                if (this.intervalId == null) {
+                    return
+                }
                 if (curdateTime < finaldateTime) {
                     let nextHit = curdateTime + 60 * 1000
                     await this.getTicks(curdateTime, nextHit, async (ticks) => {
                         this.onTick && (await this.onTick(ticks, nextHit))
-                    })
+                    }).catch(this.onError)
                     curdateTime = nextHit
                     this.intervalId = setTimeout(loadNextMinute, 1000)
                 } else {
@@ -174,6 +180,7 @@ export class TickerApi {
                     this.onTick && (await this.onTick([], finaldateTime))
                 }
             }
+            this.intervalId = 1
             loadNextMinute()
         }
     }

@@ -22,13 +22,16 @@ export function EventListeners() {
         })
         let curFrameDatetimems: number = 0
         const $1Minute = 60 * 1000
+        const $30mins = 30 * 60 * 1000
+        const $100Ms = 100
         tickerApi.listen(async (ticks: Tick[], dateTime) => {
             // todo: process orders
-
+            let dummyTick = new Tick({
+                datetime: dateTime
+            })
+            // console.log('Reieceved', ticks.length, 'ticks', ticks)
             if (ticks.length == 0) {
-                let dummyTick = new Tick({
-                    datetime: dateTime
-                })
+
                 let dummySnapshot = {
                     date: dummyTick.getDate(),
                     time: dummyTick.getTime(),
@@ -56,11 +59,66 @@ export function EventListeners() {
                             time: tick.getTime(),
                             ticks: Array.from(frame.values())
                         } as Snapshot
+                        tickerApi.setSnapshot(snap)
+                        publishEvent(Topic.SNAPSHOT_UPDATE, snap)
+                    }
+                }
+                let snap = {
+                    date: dummyTick.getDate(),
+                    time: dummyTick.getTime(),
+                    ticks: Array.from(frame.values())
+                } as Snapshot
+                tickerApi.setSnapshot(snap)
+                publishEvent(Topic.SNAPSHOT_UPDATE, snap)
+
+            }
+            else if (uiTimeFrame == 'realtime') {
+                for (let tick of ticks) {
+                    if (tick.datetime < (curFrameDatetimems + $1Minute)) {
+                        frame.set(tick.symbol, tick)
+                    }
+                    else {
+                        curFrameDatetimems = tick.datetime
+                        let snap = {
+                            date: tick.getDate(),
+                            time: tick.getTime(),
+                            ticks: Array.from(frame.values())
+                        } as Snapshot
+                        tickerApi.setSnapshot(snap)
+                        publishEvent(Topic.SNAPSHOT_UPDATE, snap)
+                    }
+                }
+                let snap = {
+                    date: dummyTick.getDate(),
+                    time: dummyTick.getTime(),
+                    ticks: Array.from(frame.values())
+                } as Snapshot
+                tickerApi.setSnapshot(snap)
+                publishEvent(Topic.SNAPSHOT_UPDATE, snap)
+            }
+            else if (uiTimeFrame == 'fastforward') {
+                for (let tick of ticks) {
+                    if (tick.datetime < (curFrameDatetimems + $30mins)) {
+                        frame.set(tick.symbol, tick)
+                    }
+                    else {
+                        curFrameDatetimems = tick.datetime
+                        let snap = {
+                            date: tick.getDate(),
+                            time: tick.getTime(),
+                            ticks: Array.from(frame.values())
+                        } as Snapshot
                         publishEvent(Topic.SNAPSHOT_UPDATE, snap)
                         tickerApi.setSnapshot(snap)
                     }
                 }
-
+                let snap = {
+                    date: dummyTick.getDate(),
+                    time: dummyTick.getTime(),
+                    ticks: Array.from(frame.values())
+                } as Snapshot
+                tickerApi.setSnapshot(snap)
+                publishEvent(Topic.SNAPSHOT_UPDATE, snap)
             }
 
         }, (e) => {
@@ -128,10 +186,11 @@ export function EventListeners() {
     return (
         <BottomSheet
             title="Time Travel"
-            visible={showTimeTravel} onDismiss={() => {
+            visible={showTimeTravel}
+            onDismiss={() => {
                 setShowTimeTravel(false)
             }}>
-            <TimeTravel />
+            <TimeTravel onDismiss={() => setShowTimeTravel(false)} />
         </BottomSheet>
     )
 }

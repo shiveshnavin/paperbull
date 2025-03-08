@@ -41,6 +41,19 @@ export class Tick {
         return `${hours}${minutes}`;
     }
 
+    getTimeFormatted(): string {
+        const date = new Date(this.datetime);
+        // Convert to IST (UTC+5:30)
+        const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+        const istTime = new Date(date.getTime() + istOffset);
+
+        // Format as HHmm
+        const hours = String(istTime.getUTCHours()).padStart(2, '0');
+        const minutes = String(istTime.getUTCMinutes()).padStart(2, '0');
+        const secs = String(istTime.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}:${secs}`;
+    }
+
     // Get the current date in IST (YYYY-MM-DD format)
     getDate(): string {
         const date = new Date(this.datetime);

@@ -158,7 +158,7 @@ export class SqliteTickerApi extends TickerApi {
         : Promise<number> {
 
 
-        const batchSize = 100; // Define batch size
+        const batchSize = 1000; // Define batch size
         let offset = 0;
         let totalFetched = 0;
 
@@ -181,8 +181,10 @@ export class SqliteTickerApi extends TickerApi {
 
             const result: any = await this.dbHot.getAllAsync(query);
             let ticks = result.map(this.mapDbRowToTick);
+
             await onTick(ticks);
             if (ticks.length === 0) break;
+            // console.log('query', datetimefrom, dum.getTime(), datetimeto, dum2.getTime(), '->', ticks.length)
 
             totalFetched += ticks.length;
             offset += batchSize;
