@@ -172,7 +172,7 @@ export function TimeTravel({ onDismiss }: any) {
 
 
             {
-                (prevTimeValue != timeValue || preDateValue != dateValue) && (
+                (prevTimeValue != timeValue || preDateValue != dateValue || true) && (
 
                     <>
                         <DropDownView
@@ -209,8 +209,12 @@ export function TimeTravel({ onDismiss }: any) {
                             flexDirection: 'row'
                         }}>
                             <ButtonView
+                                disabled={(prevTimeValue == timeValue && preDateValue == dateValue)}
                                 style={{
-                                    width: '50%'
+                                    width: '50%',
+                                    backgroundColor: (
+                                        (prevTimeValue == timeValue && preDateValue == dateValue) ? theme.colors.caption : theme.colors.accent
+                                    )
                                 }}
                                 onPress={() => {
                                     if ((timeValue) < (prevTimeValue)) {
@@ -225,14 +229,15 @@ export function TimeTravel({ onDismiss }: any) {
                                     setPreTimeValue(timeValue)
                                 }}>Seek</ButtonView>
                             <ButtonView
-                                disabled={(timeValue) < (prevTimeValue)}
+                                disabled={(timeValue) < (prevTimeValue) || (prevTimeValue == timeValue && preDateValue == dateValue)}
                                 style={{
                                     width: '50%',
                                     backgroundColor: (
-                                        (timeValue) < (prevTimeValue) ? theme.colors.caption : theme.colors.accent
+                                        (timeValue) < (prevTimeValue) || (prevTimeValue == timeValue && preDateValue == dateValue) ? theme.colors.caption : theme.colors.accent
                                     )
                                 }}
                                 onPress={() => {
+                                    tickerApi.stopSeek()
                                     tickerApi.uiTimeframe = uiTimeFrame
                                     tickerApi.seekForward(dateValue, times[timeValue])
                                     setPreTimeValue(timeValue)

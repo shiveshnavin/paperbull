@@ -30,8 +30,8 @@ export default function Watchlist() {
   }
 
   useEffect(() => {
-    // fetchSnapShot()
-  }, [tickerApi.getCurrentSnapshot()])
+    fetchSnapShot()
+  }, [])
 
   useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot) => {
     setSnapshot(snapshot)

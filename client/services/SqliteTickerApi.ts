@@ -50,13 +50,7 @@ export class SqliteTickerApi extends TickerApi {
         // Convert resolution to an interval in milliseconds.
         let resolutionInterval: number | null = 0;
         if (resolution !== "realtime") {
-            const unit = resolution.slice(-1);
-            const value = parseInt(resolution);
-            if (unit === "s") {
-                resolutionInterval = value * 1000;
-            } else if (unit === "m") {
-                resolutionInterval = value * 60 * 1000;
-            }
+            resolutionInterval = this.parseResolution(resolution)
         }
 
         // Build the base query with parameter placeholders.
@@ -154,6 +148,31 @@ export class SqliteTickerApi extends TickerApi {
         ])
     }
 
+    async getNextTicks(datetimefrom: number, limit: number, onTick: (ticks: Tick[]) => Promise<void>)
+        : Promise<number> {
+        let totalFetched = 0;
+        const query = `
+                SELECT * FROM ${TABLE_MARKET_DATA_RUNTIME} 
+                WHERE (datetime >= ${datetimefrom} )
+                ORDER BY datetime ASC
+                LIMIT ${limit}
+            `;
+
+        let dum = new Tick({
+            datetime: datetimefrom
+        })
+        // console.log('query', dum.getTime(), query)
+
+        const result: any = await this.dbHot.getAllAsync(query);
+        let ticks = result.map(this.mapDbRowToTick);
+
+        await onTick(ticks);
+        // console.log('query', datetimefrom, dum.getTime(), datetimeto, dum2.getTime(), '->', ticks.length)
+
+        totalFetched += ticks.length;
+
+        return totalFetched;
+    }
     async getTicks(datetimefrom: number, datetimeto: number, onTick: (ticks: Tick[]) => Promise<void>)
         : Promise<number> {
 

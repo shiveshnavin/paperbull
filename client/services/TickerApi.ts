@@ -118,6 +118,22 @@ export class TickerApi {
         throw new Error('getTicks Not implemented')
     }
 
+    async getNextTicks(datetimefrom: number, limit: number, onTick: (ticks: Tick[]) => Promise<void>)
+        : Promise<number> {
+        throw new Error('getNextTicks Not implemented')
+    }
+    parseResolution(resolution: string) {
+        let resolutionInterval = 0
+        const unit = resolution.slice(-1);
+        const value = parseInt(resolution);
+        if (unit === "s") {
+            resolutionInterval = value * 1000;
+        } else if (unit === "m") {
+            resolutionInterval = value * 60 * 1000;
+        }
+        return resolutionInterval
+    }
+
     async seekForward(date: string, time: string) {
         this.stopSeek()
         this.intervalId = 1
@@ -149,9 +165,23 @@ export class TickerApi {
                 }
                 if (curdateTime < finaldateTime) {
                     let nextHit = curdateTime + 1000
-                    await this.getTicks(curdateTime, nextHit, async (ticks) => {
+                    let fetchedcount = await this.getTicks(curdateTime, nextHit, async (ticks) => {
+                        ticks.forEach(t => {
+                            console.log('ticks realtime', new Date(t.datetime), t.last_price)
+                        })
                         this.onTick && (await this.onTick(ticks, nextHit))
                     }).catch(this.onError)
+                    if (fetchedcount == 0) {
+                        let fetchedcountNext = await this.getNextTicks(curdateTime, 1, async (ticks) => {
+                            ticks.forEach(t => {
+                                if (nextHit < t.datetime) {
+                                    nextHit = t.datetime
+                                }
+                                console.log('getNextTicks realtime', new Date(t.datetime), t.last_price)
+                            })
+                            this.onTick && (await this.onTick(ticks, nextHit))
+                        }).catch(this.onError)
+                    }
                     curdateTime = nextHit
                     this.intervalId = setTimeout(loadNextMinute, 100)
                 } else {

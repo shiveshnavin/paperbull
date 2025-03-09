@@ -20,7 +20,7 @@ export function ScipDisplay(props: {
             }}>
                 <VBox>
                     <TitleText>{props.tick.getReadableName()}</TitleText>
-                    <Caption>{props.tick.getType()}</Caption>
+                    <Caption>{props.tick.getTimeFormatted()}</Caption>
                 </VBox>
                 <VBox style={{
                     alignItems: 'flex-end',
