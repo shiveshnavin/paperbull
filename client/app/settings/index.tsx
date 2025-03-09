@@ -269,7 +269,7 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone, onSubsc
     const [loadProgress, setLoadProgress] = useState(-1)
     const [processComplete, setProcessComplete] = useState<String | undefined>(undefined)
     const [processError, setErocessError] = useState<String | undefined>(undefined)
-    const publisher = useEventPublisher()
+    const publishEvent = useEventPublisher()
 
     useEffect(() => {
         Storage.getKeyAsync('preferred_resolution').then(r => {
@@ -401,6 +401,7 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone, onSubsc
                         return
                     }
 
+                    publishEvent(Topic.SUBSCRIBE, { symbols: symbols })
                     setLoading(true)
                     tickerApi.subscribe(selected, resolution, (p, t) => {
                         setLoadProgress((p * 100 / t))

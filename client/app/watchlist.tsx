@@ -3,7 +3,7 @@ import { useStyle } from '../components/style';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { AppContext } from '../components/AppContext';
 import { Snapshot } from '../services/TickerApi';
-import { Topic, useEventListener } from '../components/store';
+import { Topic, useEventListener, useEventPublisher } from '../components/store';
 import { ScipDisplay } from '../components/Instrument';
 import { Tick } from '../services/models/Tick';
 import { PaperbullTimeBar } from '../components/Slider';
@@ -19,12 +19,13 @@ export default function Watchlist() {
   const tickerApi = context.tickApi
   const [error, setError] = useState<string | undefined>(undefined)
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
-
+  const publishEvent = useEventPublisher()
   const [showSelectSymbols, setShowSelectSymbols] = useState(false)
   const [availableSymbols, setAvailableSymbols] = useState<Tick[]>([])
 
   const onSubscribe = useCallback(
     (symbols: string[]) => {
+      publishEvent(Topic.SUBSCRIBE, { symbols: symbols })
       setShowSelectSymbols(false);
       Storage.setKeyAsync('symbols', JSON.stringify(symbols));
       tickerApi.getSnapShot(
@@ -103,14 +104,15 @@ export default function Watchlist() {
         </PressableView>
         {
           //@ts-ignore
-          [...(snapshot?.ticks || [])].sort((a, b) => a.symbol.localeCompare(b.symbol))?.map(t => {
-            return (
-              <ScipDisplay key={t.symbol + '' + t.datetime} tick={t} prevTick={new Tick({
-                ...t,
-                last_price: t.last_price - 10
-              })} />
-            )
-          })
+          [...(snapshot?.ticks || [])]
+            .sort((a, b) => a.symbol.localeCompare(b.symbol))?.map(t => {
+              return (
+                <ScipDisplay key={t.symbol + '' + t.datetime} tick={t} prevTick={new Tick({
+                  ...t,
+                  last_price: t.last_price - 10
+                })} />
+              )
+            })
         }
 
         <BottomSheet

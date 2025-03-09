@@ -10,13 +10,13 @@ import { Tick } from "../services/models/Tick"
 
 export function EventListeners() {
     const [showTimeTravel, setShowTimeTravel] = useState(false)
+    const [frame, setFrame] = useState(new Map<string, Tick>())
     const [ingestCsvCancel, setIngestCsvCancel] = useState(() => () => { })
     const appContext = useContext(AppContext)
     const tickerApi = appContext.context.tickApi
     const publishEvent = useEventPublisher()
 
     useEffect(() => {
-        let frame = new Map<string, Tick>()
         tickerApi.getCurrentSnapshot().ticks.forEach(t => {
             frame.set(t.symbol, t)
         })
@@ -158,26 +158,7 @@ export function EventListeners() {
 
 
     useEventListener(Topic.SUBSCRIBE, async ({ symbols, resolution }: { symbols: string[], resolution: Resolution }) => {
-        let sqliteTickerApi = tickerApi as SqliteTickerApi
-        await sqliteTickerApi.init()
-
-        sqliteTickerApi.subscribe(symbols, resolution,
-            (progress, total) => {
-                publishEvent(Topic.SUBSCRIBE_PROGRESS, {
-                    progress,
-                    total
-                })
-            }, (onCancel) => {
-                setIngestCsvCancel(() => onCancel)
-            })
-            .then(() => {
-
-            })
-            .catch(e => {
-                publishEvent(Topic.SUBSCRIBE_ERROR, {
-                    message: 'Error subscribing market data. ' + e.message
-                })
-            })
+        frame.clear()
     })
 
     return (

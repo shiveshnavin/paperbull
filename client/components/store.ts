@@ -70,8 +70,6 @@ export const useEventPublisher = () => {
 
 export const Topic = {
     SUBSCRIBE: 'SUBSCRIBE',
-    SUBSCRIBE_PROGRESS: 'SUBSCRIBE_PROGRESS',
-    SUBSCRIBE_ERROR: 'SUBSCRIBE_ERROR',
 
     TIME_TRAVEL: 'TIME_TRAVEL',
     SNAPSHOT_UPDATE: 'SNAPSHOT_UPDATE',
