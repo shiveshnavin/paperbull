@@ -238,7 +238,7 @@ export class TickerApi {
         return (await this.getSnapShot(date, time)).ticks
     }
 
-    async getSnapShot(date: string, time: string): Promise<Snapshot> {
+    async getSnapShot(date: string, time: string, force?: boolean): Promise<Snapshot> {
         return {} as Snapshot
     }
 

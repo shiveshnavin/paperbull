@@ -27,12 +27,13 @@ export default function Watchlist() {
     (symbols: string[]) => {
       publishEvent(Topic.SUBSCRIBE, { symbols: symbols })
       setShowSelectSymbols(false);
+      tickerApi.setSymbols(symbols)
       Storage.setKeyAsync('symbols', JSON.stringify(symbols));
       tickerApi.getSnapShot(
         tickerApi.getCurrentSnapshot().date,
-        '0915'
-      ).then((snap) => {
-      }).catch(e => {
+        '0915',
+        true
+      ).then(setSnapshot).catch(e => {
         setError(e.message);
       })
     }, [tickerApi])

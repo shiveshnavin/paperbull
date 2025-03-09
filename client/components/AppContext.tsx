@@ -6,7 +6,7 @@ import { Tick } from "../services/models/Tick";
 
 export class Context {
     theme!: Theme
-    tickApi!: SqliteTickerApi
+    tickApi!: TickerApi
 }
 
 

@@ -325,8 +325,8 @@ export class SqliteTickerApi extends TickerApi {
         return ticks;
     }
 
-    async getSnapShot(date: string, time: string): Promise<Snapshot> {
-        if ((this.snapshot?.date == date
+    async getSnapShot(date: string, time: string, force?: boolean): Promise<Snapshot> {
+        if (!force && (this.snapshot?.date == date
             && this.snapshot.time == time
             && this.snapshot.ticks?.length > 0)) {
             return this.snapshot
