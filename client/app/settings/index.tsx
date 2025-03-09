@@ -1,6 +1,6 @@
 import { BottomSheet, ButtonView, Caption, CardView, CompositeTextInputView, DropDownView, Expand, HBox, KeyboardAvoidingScrollView, LoadingButton, PressableView, ProgressBarView, Spinner, Storage, Subtitle, SwitchView, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
 import { useStyle } from "../../components/style";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import { Button, FlatList } from "react-native";
 import { FilePicker } from "../../components/filepicker/FilePicker";
 import { Topic, useEventListener, useEventPublisher } from "../../components/store";
@@ -76,6 +76,21 @@ export function MetaData() {
         }
     })
 
+    const onSubscribe = useCallback(
+        (symbols: string[]) => {
+            setShowSelectSymbols(false);
+            Storage.setKeyAsync('symbols', JSON.stringify(symbols));
+            tickerApi.getSnapShot(
+                tickerApi.getCurrentSnapshot().date,
+                '0915'
+            ).then((snap) => {
+            }).catch(e => {
+                setError(e.message);
+            }).finally(() => {
+                setLoading(false);
+            });
+        }, [tickerApi])
+
     return (
         <CardView key="metadata">
             <Subtitle>Dataset Info</Subtitle>
@@ -84,7 +99,7 @@ export function MetaData() {
                     <Spinner />
                 )
             }
-            {
+            {/* {
                 tickerApi.getCurrentSnapshot()?.date && (
                     <PressableView onPress={() => {
                         setShowSelectSymbols(true)
@@ -94,12 +109,12 @@ export function MetaData() {
                         }}>Currently selected date is {tickerApi.getCurrentSnapshot()?.date} with {tickerApi.getSymbols().length} instruments selected for paper trading.</TextView>
                     </PressableView>
                 )
-            }
+            } */}
             <HBox>
                 <TextView>You have total {size} data points across {availableSymbols.length} instruments in this dataset.</TextView>
             </HBox>
             <Expand
-                initialExpand={true}
+                initialExpand={false}
                 title="Available Dates"
                 style={{
                     paddingStart: 0,
@@ -111,18 +126,19 @@ export function MetaData() {
                 {
                     availableDates.map((a, idx) => {
                         return (
-                            <PressableView key={`${a}-${idx}`}
-                                onPress={() => {
-                                    tickerApi.setSnapshot({
-                                        date: a,
-                                        ticks: [],
-                                        time: '0915'
-                                    })
-                                    Storage.setKeyAsync('snapshot', JSON.stringify(tickerApi.getCurrentSnapshot()))
-                                    setShowSelectSymbols(true)
-                                }}>
-                                <TitleText style={style.link} >{a}</TitleText>
-                            </PressableView>
+                            // <PressableView key={`${a}-${idx}`}
+                            //     onPress={() => {
+                            //         tickerApi.setSnapshot({
+                            //             date: a,
+                            //             ticks: [],
+                            //             time: '0915'
+                            //         })
+                            //         Storage.setKeyAsync('snapshot', JSON.stringify(tickerApi.getCurrentSnapshot()))
+                            //         setShowSelectSymbols(true)
+                            //     }}>
+                            // <TitleText style={style.link} >{a}</TitleText>
+                            // </PressableView>
+                            <TitleText>{a}</TitleText>
                         )
                     })
                 }
@@ -147,19 +163,8 @@ export function MetaData() {
                 <SearchBox
                     selectedSymbols={tickerApi.getSymbols() || []}
                     symbols={availableSymbols.map(m => m.symbol)}
-                    onDone={(symbols) => {
-                        setShowSelectSymbols(false);
-                        Storage.setKeyAsync('symbols', JSON.stringify(symbols));
-                        tickerApi.getSnapShot(
-                            tickerApi.getCurrentSnapshot().date,
-                            '0915'
-                        ).then((snap) => {
-                        }).catch(e => {
-                            setError(e.message);
-                        }).finally(() => {
-                            setLoading(false);
-                        });
-                    }}
+                    onSubscribe={onSubscribe}
+                    onDone={onSubscribe}
                     tickerApi={tickerApi} />
             </BottomSheet>
         </CardView>
@@ -196,7 +201,7 @@ export function LoadCsv() {
     return (
         <CardView key="loadcsv">
             <Subtitle>Load CSV</Subtitle>
-            <TextView>Select a file containing the market data. Existing data will be unloaded when you load new data.</TextView>
+            <TextView>Select a file containing the market data.</TextView>
             <SwitchView
                 style={{
                     paddingTop: theme.dimens.space.sm
@@ -252,7 +257,7 @@ export function LoadCsv() {
 }
 
 
-export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { symbols: string[], tickerApi: TickerApi, selectedSymbols: string[], onDone: (syms: string[]) => void }) {
+export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone, onSubscribe }: { symbols: string[], tickerApi: TickerApi, selectedSymbols: string[], onDone: (syms: string[]) => void, onSubscribe?: (syms: string[]) => void }) {
     const [searchText, setSearchText] = useState('');
     const [selected, setSelected] = useState<string[]>([...selectedSymbols]);
     const theme = useContext(ThemeContext)
@@ -310,29 +315,39 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { sym
                             placeholder="Search symbols..."
                             onChangeText={(text) => setSearchText(text)}
                         />
-                        <DropDownView
-                            title="Resolution"
-                            options={resolutions.map(op => ({
-                                id: op,
-                                value: op,
-                                title: op
-                            }))}
-                            selectedId={resolution}
-                            onSelect={(g) => {
-                                Storage.setKeyAsync('preferred_resolution', g)
-                                setResolution(g as any)
-                            }}
+                        {
+                            !onSubscribe && (<DropDownView
+                                title="Resolution"
+                                options={resolutions.map(op => ({
+                                    id: op,
+                                    value: op,
+                                    title: op
+                                }))}
+                                selectedId={resolution}
+                                onSelect={(g) => {
+                                    Storage.setKeyAsync('preferred_resolution', g)
+                                    setResolution(g as any)
+                                }}
 
-                        />
+                            />)
+                        }
+
                     </>
                 )
             }
-            <Caption>
-                Realtime resolution processes all ticks but has poor performance while 10 min resolution has best performance but processes ticks from 10 min intervals.
-            </Caption>
-            <Caption>
-                Select only those symbols that you intend to monitor or paper trade for better performance.
-            </Caption>
+            {
+                !onSubscribe && (
+                    <>
+                        <Caption>
+                            Realtime resolution processes all ticks but has poor performance while 10 min resolution has best performance but processes ticks from 10 min intervals.
+                        </Caption>
+                        <Caption>
+                            Select only those symbols that you intend to monitor or paper trade for better performance.
+                        </Caption>
+                    </>
+                )
+            }
+
 
             {
                 loadProgress == -1 && (
@@ -377,10 +392,14 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone }: { sym
                 style={{
                     display: loadProgress > -1 ? "none" : "flex"
                 }}
-                text={"Subscribe"}
+                text={"Save watchlist"}
                 disabled={loading}
                 loading={loading}
                 onPress={() => {
+                    if (onSubscribe) {
+                        onSubscribe(selected)
+                        return
+                    }
 
                     setLoading(true)
                     tickerApi.subscribe(selected, resolution, (p, t) => {

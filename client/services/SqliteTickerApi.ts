@@ -86,6 +86,16 @@ export class SqliteTickerApi extends TickerApi {
 
         // Process the data in batches.
         let lastInsert: MarketDataRow | undefined = undefined
+        try {
+            await this.deleteHotMktIndex()
+            await this.dbHot.execAsync("PRAGMA synchronous = OFF;");
+            await this.dbHot.execAsync("PRAGMA journal_mode = MEMORY;");
+            await this.dbHot.execAsync("PRAGMA temp_store = MEMORY;");
+            await this.dbHot.execAsync("PRAGMA locking_mode = EXCLUSIVE;");
+        } catch (e: any) {
+            console.log('Perf optimization during subscribe failed', e.message)
+        }
+
         while (!isCancelled) {
             perf.start('subscribe-batch')
 
@@ -159,7 +169,9 @@ export class SqliteTickerApi extends TickerApi {
                     record.last_price,
                 ]);
                 perf.start('subscribe-batch-write')
-                await this.dbHot.runAsync(sql, params);
+                await this.dbHot.withTransactionAsync(async () => {
+                    await this.dbHot.runAsync(sql, params);
+                });
                 perf.stop('subscribe-batch-write').log('subscribe-batch-write')
                 perf.stop('subscribe-batch').log('subscribe-batch')
 
@@ -169,6 +181,8 @@ export class SqliteTickerApi extends TickerApi {
             if (batch.length < batchSize) break;
             offset += batchSize;
         }
+
+        this.createHotMktIndex()
         console.log('subscribed ', inserts, 'data points captured in hot db')
     }
 
@@ -209,15 +223,18 @@ export class SqliteTickerApi extends TickerApi {
         : Promise<number> {
 
 
-        const batchSize = 1000; // Define batch size
+        const batchSize = 5000; // Define batch size
         let offset = 0;
         let totalFetched = 0;
+        const tokensPlaceholder = this.symbols.map(() => '?').join(',');
 
+        const perf = new PerformanceRecorder()
         while (true) {
             const query = `
-            SELECT * FROM ${TABLE_MARKET_DATA_RUNTIME} 
+            SELECT * FROM ${TABLE_MARKET_DATA_FULL} 
             WHERE (datetime >= ${datetimefrom} )
             AND (datetime <= ${datetimeto} )
+            AND symbol in (${tokensPlaceholder})
             ORDER BY datetime ASC
             LIMIT ${batchSize} OFFSET ${offset}
         `;
@@ -230,12 +247,15 @@ export class SqliteTickerApi extends TickerApi {
             })
             // console.log('query', dum.getTime(), dum2.getTime(), query)
 
-            const result: any = await this.dbHot.getAllAsync(query);
+            perf.start('get-ticks')
+            const result: any = await this.dbCold.getAllAsync(query, this.symbols);
             let ticks = result.map(this.mapDbRowToTick);
+            perf.stop('get-ticks').log('get-ticks')
 
-            await onTick(ticks);
-            if (ticks.length === 0) break;
             // console.log('query', datetimefrom, dum.getTime(), datetimeto, dum2.getTime(), '->', ticks.length)
+            await onTick(ticks);
+
+            if (ticks.length === 0) break;
 
             totalFetched += ticks.length;
             offset += batchSize;
@@ -314,10 +334,10 @@ export class SqliteTickerApi extends TickerApi {
 
         const placeholders = this.symbols.map(() => '?').join(',');
         let query = `
-            SELECT m.* FROM ${TABLE_MARKET_DATA_RUNTIME} m
+            SELECT m.* FROM ${TABLE_MARKET_DATA_FULL} m
              INNER JOIN (
                 SELECT symbol, MAX(datetime) AS max_datetime
-                FROM ${TABLE_MARKET_DATA_RUNTIME}
+                FROM ${TABLE_MARKET_DATA_FULL}
                 WHERE symbol IN (${placeholders})
                 AND ( date = '${date}' AND time <= '${time}')
                 GROUP BY symbol
@@ -326,7 +346,7 @@ export class SqliteTickerApi extends TickerApi {
             AND m.datetime = latest.max_datetime
         `;
 
-        const result: any = await this.dbHot.getAllAsync(query, this.symbols);
+        const result: any = await this.dbCold.getAllAsync(query, this.symbols);
         // console.log(query, this.symbols)
         // console.log('result==>', result)
 
@@ -350,8 +370,6 @@ export class SqliteTickerApi extends TickerApi {
             this.dbHot = await SQLite.openDatabaseAsync('market_data_runtime.sqlite');
             await this.dbCold.execAsync('PRAGMA journal_mode = WAL');
             await this.dbCold.execAsync('PRAGMA foreign_keys = ON');
-            await this.dbHot.execAsync('PRAGMA journal_mode = WAL');
-            await this.dbHot.execAsync('PRAGMA foreign_keys = ON');
 
             await this.createCacheTableIfNotExists()
             await this.createFullMktDataTable()
@@ -551,6 +569,28 @@ export class SqliteTickerApi extends TickerApi {
             e.message = "createFullMktIndex: " + e.message
             this.onError && this.onError(e)
         })
+
+    }
+    async deleteHotMktIndex() {
+        try {
+            await this.dbHot.execAsync(`
+            DROP INDEX IF  EXISTS idx_symbol;
+        `)
+            await this.dbHot.execAsync(`
+            DROP INDEX IF  EXISTS idx_symbol_datetime;
+        `)
+            await this.dbHot.execAsync(`
+            DROP INDEX IF  EXISTS idx_symbol_date_and_time;
+        `)
+            await this.dbHot.execAsync(`
+            DROP INDEX IF  EXISTS idx_symbol_date_time_datetime;
+        `)
+            console.log('deleteHotMktIndex compelted ')
+
+        } catch (e: any) {
+            console.log('deleteHotMktIndex failed ', e.message)
+
+        }
 
     }
     async createHotMktIndex() {

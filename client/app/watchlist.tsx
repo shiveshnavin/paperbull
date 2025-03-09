@@ -1,6 +1,6 @@
-import { AlertMessage, Center, DarkColors, HBox, KeyboardAvoidingScrollView, TextView, Theme, ThemeContext, Title, TransparentButton, TransparentCenterToolbar, VPage } from 'react-native-boxes';
+import { AlertMessage, BottomSheet, Center, CompositeTextInputView, DarkColors, HBox, KeyboardAvoidingScrollView, PressableView, Storage, TextView, Theme, ThemeContext, Title, TransparentButton, TransparentCenterToolbar, VPage } from 'react-native-boxes';
 import { useStyle } from '../components/style';
-import { useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import { AppContext } from '../components/AppContext';
 import { Snapshot } from '../services/TickerApi';
 import { Topic, useEventListener } from '../components/store';
@@ -10,6 +10,7 @@ import { PaperbullTimeBar } from '../components/Slider';
 import { PaperbullToolbar } from '../components/PaperbullToolbar';
 import { parseTime } from '../components/TimeTravel';
 import { SqliteTickerApi } from '../services/SqliteTickerApi';
+import { SearchBox } from './settings';
 
 export default function Watchlist() {
   const theme = useContext(ThemeContext)
@@ -19,6 +20,21 @@ export default function Watchlist() {
   const [error, setError] = useState<string | undefined>(undefined)
   const [snapshot, setSnapshot] = useState<Snapshot | undefined>(undefined)
 
+  const [showSelectSymbols, setShowSelectSymbols] = useState(false)
+  const [availableSymbols, setAvailableSymbols] = useState<Tick[]>([])
+
+  const onSubscribe = useCallback(
+    (symbols: string[]) => {
+      setShowSelectSymbols(false);
+      Storage.setKeyAsync('symbols', JSON.stringify(symbols));
+      tickerApi.getSnapShot(
+        tickerApi.getCurrentSnapshot().date,
+        '0915'
+      ).then((snap) => {
+      }).catch(e => {
+        setError(e.message);
+      })
+    }, [tickerApi])
   function fetchSnapShot() {
     if (tickerApi.getCurrentSnapshot()?.date == undefined) {
       setError('Please select a date from settings.')
@@ -31,6 +47,17 @@ export default function Watchlist() {
 
   useEffect(() => {
     fetchSnapShot()
+    tickerApi.
+      getAvailableSymbols()
+      .then((symbols) => {
+        setAvailableSymbols(symbols)
+        let dates = new Set<string>()
+        let times = new Set<string>()
+        symbols.forEach(s => {
+          dates.add(s.getDate())
+          times.add(s.getTime())
+        })
+      })
   }, [])
 
   useEventListener(Topic.SNAPSHOT_UPDATE, (snapshot) => {
@@ -61,6 +88,19 @@ export default function Watchlist() {
             <AlertMessage id="AlertMessage" type='critical' text={error} />
           )
         }
+        <PressableView
+          style={{
+            padding: theme.dimens.space.lg,
+            borderRadius: theme.dimens.space.md,
+            backgroundColor: theme.colors.forground,
+            margin: theme.dimens.space.sm,
+          }}
+          onPress={() => {
+            tickerApi.stopSeek()
+            setShowSelectSymbols(true)
+          }}>
+          <TextView>Search for symbols...</TextView>
+        </PressableView>
         {
           //@ts-ignore
           [...(snapshot?.ticks || [])].sort((a, b) => a.symbol.localeCompare(b.symbol))?.map(t => {
@@ -72,6 +112,19 @@ export default function Watchlist() {
             )
           })
         }
+
+        <BottomSheet
+          onDismiss={() => {
+            setShowSelectSymbols(false)
+          }}
+          title="Select instruments" visible={showSelectSymbols}>
+          <SearchBox
+            selectedSymbols={tickerApi.getSymbols() || []}
+            symbols={availableSymbols.map(m => m.symbol)}
+            onSubscribe={onSubscribe}
+            onDone={onSubscribe}
+            tickerApi={tickerApi} />
+        </BottomSheet>
       </KeyboardAvoidingScrollView>
     </VPage>
   );

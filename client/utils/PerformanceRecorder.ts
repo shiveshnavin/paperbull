@@ -30,7 +30,7 @@ export class PerformanceRecorder {
     log(label: string): void {
         const duration = this.getDuration(label);
         if (duration !== null) {
-            console.log(`Performance of ${label}: ${duration.toFixed(2)} ms`);
+            // console.log(`Performance of ${label}: ${duration.toFixed(2)} ms`);
         }
     }
 }
