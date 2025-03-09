@@ -57,12 +57,7 @@ export class SqliteTickerApi extends TickerApi {
         // Build the base query with parameter placeholders.
         const perf = new PerformanceRecorder()
         const tokensPlaceholder = instrumentTokens.map(() => '?').join(',');
-        const baseQuery = `
-          SELECT symbol, datetime, date, time, last_price 
-          FROM ${TABLE_MARKET_DATA_FULL} 
-          WHERE symbol IN (${tokensPlaceholder})
-          ORDER BY symbol, datetime ASC
-        `;
+
 
         // Optionally, get total row count for progress updates.
         let totalRows = 0;
@@ -90,15 +85,32 @@ export class SqliteTickerApi extends TickerApi {
         if (onProgress) onProgress(processed, totalRows);
 
         // Process the data in batches.
+        let lastInsert: MarketDataRow | undefined = undefined
         while (!isCancelled) {
             perf.start('subscribe-batch')
 
             perf.start('subscribe-batch-read')
+            let baseQuery = `
+            SELECT symbol, datetime, date, time, last_price 
+            FROM ${TABLE_MARKET_DATA_FULL} 
+            WHERE symbol IN (${tokensPlaceholder}) 
+            ORDER BY symbol, datetime ASC
+          `;
+            let batchQuery = `${baseQuery} LIMIT ${batchSize}`;// OFFSET ${offset}
+            if (lastInsert) {
+                baseQuery = `
+                SELECT symbol, datetime, date, time, last_price 
+                FROM ${TABLE_MARKET_DATA_FULL} 
+                WHERE symbol IN (${tokensPlaceholder}) AND (symbol, datetime) > ('${lastInsert.symbol}', '${lastInsert.datetime}')
+                ORDER BY symbol, datetime ASC
+              `;
+                batchQuery = `${baseQuery} LIMIT ${batchSize}`;// OFFSET ${offset}
 
-            const batchQuery = `${baseQuery} LIMIT ${batchSize} OFFSET ${offset}`;
+            }
 
             const explainQuery = `EXPLAIN QUERY PLAN ${batchQuery}`
             const explainQueryResult: any = await this.dbCold.getAllAsync(explainQuery);
+            console.log('batchQuery', batchQuery)
             console.log('explainQueryResult', explainQueryResult)
 
             const batch: any[] = await this.dbCold.getAllAsync(batchQuery, instrumentTokens);
@@ -129,7 +141,7 @@ export class SqliteTickerApi extends TickerApi {
 
                 // Insert the row into the runtime (hot) database.
                 toInsertBatch.push(row);
-
+                lastInsert = row
 
                 if (onProgress) onProgress(processed, totalRows);
                 processed++;
@@ -516,7 +528,7 @@ export class SqliteTickerApi extends TickerApi {
         `);
     }
     async createFullMktIndex() {
-        console.log('Creating index')
+        console.log('Creating cold index')
         await Promise.all([
             this.dbCold.execAsync(`
                 CREATE INDEX IF NOT EXISTS idx_symbol ON ${TABLE_MARKET_DATA_FULL}(symbol);
@@ -527,6 +539,9 @@ export class SqliteTickerApi extends TickerApi {
             `),
             this.dbCold.execAsync(`
                 CREATE INDEX IF NOT EXISTS idx_symbol_date_and_time  ON ${TABLE_MARKET_DATA_FULL}(symbol, date, time);
+            `),
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol_date_time_datetime   ON ${TABLE_MARKET_DATA_FULL}(symbol, date, time, datetime);
             `)
         ]).then(() => {
             console.log('createFullMktIndex compelted ')
@@ -539,8 +554,28 @@ export class SqliteTickerApi extends TickerApi {
 
     }
     async createHotMktIndex() {
-        await this.dbHot.execAsync(`
-            CREATE INDEX idx_symbol_date_time_${TABLE_MARKET_DATA_RUNTIME} ON users(symbol, date, time);
-        `)
+        console.log('Creating hot data index')
+        await Promise.all([
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol ON ${TABLE_MARKET_DATA_RUNTIME}(symbol);
+            `),
+
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol_datetime  ON ${TABLE_MARKET_DATA_RUNTIME}(symbol, datetime);
+            `),
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol_date_and_time  ON ${TABLE_MARKET_DATA_RUNTIME}(symbol, date, time);
+            `),
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol_date_time_datetime   ON ${TABLE_MARKET_DATA_RUNTIME}(symbol, date, time, datetime);
+            `)
+        ]).then(() => {
+            console.log('createHotMktIndex compelted ')
+        }).catch(e => {
+            console.log('Creating index failed', e.message)
+
+            e.message = "createHotMktIndex: " + e.message
+            this.onError && this.onError(e)
+        })
     }
 }
