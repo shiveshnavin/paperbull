@@ -5,7 +5,8 @@ import { useContext } from "react";
 import { AppContext } from "./AppContext";
 
 export function PaperbullToolbar(props: SimpleToolbarProps & {
-    time?: string
+    time?: string,
+    date?: string
 }) {
     const theme = useContext(ThemeContext)
     const style = useStyle(theme)
@@ -16,7 +17,7 @@ export function PaperbullToolbar(props: SimpleToolbarProps & {
                 title={(
                     <Center>
                         <TitleText style={style.nospaces}>{props.title}</TitleText>
-                        {props.time && <Caption style={style.nospaces}>{props.time}</Caption>}
+                        {(props.time || props.date) && <Caption style={[style.nospaces, style.link]}>{props.date} at {props.time}</Caption>}
                     </Center>
                 ) as any} />
         </VBox>

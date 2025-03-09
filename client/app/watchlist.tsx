@@ -69,6 +69,7 @@ export default function Watchlist() {
     setSnapshot(snapshot)
   })
   let time = parseTime(tickerApi.getCurrentSnapshot().time)
+  let date = (tickerApi.getCurrentSnapshot().date)
   if (tickerApi.getCurrentSnapshot()?.ticks?.length > 0) {
     let tick = tickerApi.getCurrentSnapshot()?.ticks
       ?.reduce((max, tick) => (tick.datetime > max.datetime ? tick : max));
@@ -78,6 +79,7 @@ export default function Watchlist() {
     <VPage style={styles.container}>
       <PaperbullToolbar
         time={time}
+        date={date}
         title="Watchlist"
         options={[{
           id: 'refresh',
