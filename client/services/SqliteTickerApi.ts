@@ -197,9 +197,12 @@ export class SqliteTickerApi extends TickerApi {
     async getNextTicks(datetimefrom: number, limit: number, onTick: (ticks: Tick[]) => Promise<void>)
         : Promise<number> {
         let totalFetched = 0;
+
+        const tokensPlaceholder = this.symbols.map(() => '?').join(',');
         const query = `
-                SELECT * FROM ${TABLE_MARKET_DATA_RUNTIME} 
+                SELECT * FROM ${TABLE_MARKET_DATA_FULL} 
                 WHERE (datetime >= ${datetimefrom} )
+                AND symbol in (${tokensPlaceholder})
                 ORDER BY datetime ASC
                 LIMIT ${limit}
             `;
@@ -209,7 +212,7 @@ export class SqliteTickerApi extends TickerApi {
         })
         // console.log('query', dum.getTime(), query)
 
-        const result: any = await this.dbHot.getAllAsync(query);
+        const result: any = await this.dbCold.getAllAsync(query, this.symbols);
         let ticks = result.map(this.mapDbRowToTick);
 
         await onTick(ticks);
@@ -245,7 +248,7 @@ export class SqliteTickerApi extends TickerApi {
             let dum2 = new Tick({
                 datetime: datetimeto
             })
-            // console.log('query', dum.getTime(), dum2.getTime(), query)
+            // console.log('query', dum.getTime(), dum2.getTime(), query, this.symbols)
 
             perf.start('get-ticks')
             const result: any = await this.dbCold.getAllAsync(query, this.symbols);

@@ -33,7 +33,10 @@ export default function Watchlist() {
         tickerApi.getCurrentSnapshot().date,
         '0915',
         true
-      ).then(setSnapshot).catch(e => {
+      ).then((s) => {
+        setSnapshot(s)
+        publishEvent(Topic.SNAPSHOT_UPDATE, s)
+      }).catch(e => {
         setError(e.message);
       })
     }, [tickerApi])

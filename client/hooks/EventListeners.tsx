@@ -29,7 +29,9 @@ export function EventListeners() {
             let dummyTick = new Tick({
                 datetime: dateTime
             })
-            // console.log('Reieceved in listener', dateTime, ticks.length)
+            // let symbolsInTick = new Set()
+            // ticks.forEach(t => symbolsInTick.add(t.symbol))
+            // console.log('Reieceved in listener', dateTime, ticks.length, symbolsInTick)
             if (ticks.length == 0) {
 
                 let dummySnapshot = {
@@ -85,6 +87,8 @@ export function EventListeners() {
                         } as Snapshot
                         tickerApi.setSnapshot(snap)
                         publishEvent(Topic.SNAPSHOT_UPDATE, snap)
+                        // console.log('publish snap fom listener', snap.ticks.length, 'ticks', snap.ticks)
+
                     }
                 }
                 let snap = {
@@ -158,7 +162,7 @@ export function EventListeners() {
 
 
     useEventListener(Topic.SUBSCRIBE, async ({ symbols, resolution }: { symbols: string[], resolution: Resolution }) => {
-        frame.clear()
+        setFrame(new Map())
     })
 
     return (

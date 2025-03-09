@@ -173,7 +173,6 @@ export class TickerApi {
                 if (curdateTime < finaldateTime) {
                     let nextHit = curdateTime + 1000
                     let fetchedcount = await this.getTicks(curdateTime, nextHit, async (ticks) => {
-
                         this.onTick && (await this.onTick(ticks, nextHit))
                     }).catch(this.onError)
                     // console.log('fetchedcount at ', new Date(curdateTime).toLocaleTimeString(), fetchedcount)
