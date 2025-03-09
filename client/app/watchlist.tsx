@@ -102,6 +102,7 @@ export default function Watchlist() {
           }}
           onPress={() => {
             tickerApi.stopSeek()
+            publishEvent(Topic.SNAPSHOT_UPDATE, tickerApi.getCurrentSnapshot())
             setShowSelectSymbols(true)
           }}>
           <TextView>Search for symbols...</TextView>
