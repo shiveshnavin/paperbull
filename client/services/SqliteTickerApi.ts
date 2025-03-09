@@ -6,6 +6,7 @@ import * as SQLite from 'expo-sqlite';
 import { Resolution, Snapshot, TickerApi } from './TickerApi';
 import { PickedFile } from '../components/filepicker/FilePickerProps';
 import { Tick } from './models/Tick';
+import { PerformanceRecorder } from '../utils/PerformanceRecorder';
 
 const CHUNK_SIZE = 512 * 1024; // 64KB chunks
 const BATCH_SIZE = 200;    // Number of records per insert batch
@@ -54,6 +55,7 @@ export class SqliteTickerApi extends TickerApi {
         }
 
         // Build the base query with parameter placeholders.
+        const perf = new PerformanceRecorder()
         const tokensPlaceholder = instrumentTokens.map(() => '?').join(',');
         const baseQuery = `
           SELECT symbol, datetime, date, time, last_price 
@@ -65,6 +67,7 @@ export class SqliteTickerApi extends TickerApi {
         // Optionally, get total row count for progress updates.
         let totalRows = 0;
         try {
+            perf.start('subscribe-count')
             const countQuery = `
             SELECT COUNT(*) as count 
             FROM ${TABLE_MARKET_DATA_FULL} 
@@ -72,12 +75,14 @@ export class SqliteTickerApi extends TickerApi {
           `;
             const countResult: any[] = await this.dbCold.getAllAsync(countQuery, instrumentTokens);
             totalRows = countResult[0].count;
+            perf.stop('subscribe-count').log('subscribe-count')
+
         } catch (error) {
             console.error("Error fetching total count. Progress may not be accurate.", error);
         }
 
         let processed = 0;
-        const batchSize = 1000;
+        const batchSize = 5000;
         let offset = 0;
         // Keep track of the last accepted datetime for each symbol.
         const lastCopied: { [symbol: string]: number } = {};
@@ -86,8 +91,19 @@ export class SqliteTickerApi extends TickerApi {
 
         // Process the data in batches.
         while (!isCancelled) {
+            perf.start('subscribe-batch')
+
+            perf.start('subscribe-batch-read')
+
             const batchQuery = `${baseQuery} LIMIT ${batchSize} OFFSET ${offset}`;
+
+            const explainQuery = `EXPLAIN QUERY PLAN ${batchQuery}`
+            const explainQueryResult: any = await this.dbCold.getAllAsync(explainQuery);
+            console.log('explainQueryResult', explainQueryResult)
+
             const batch: any[] = await this.dbCold.getAllAsync(batchQuery, instrumentTokens);
+            perf.stop('subscribe-batch-read').log('subscribe-batch-read')
+
             if (batch.length === 0) {
                 break;
             }
@@ -130,14 +146,18 @@ export class SqliteTickerApi extends TickerApi {
                     record.time,
                     record.last_price,
                 ]);
+                perf.start('subscribe-batch-write')
                 await this.dbHot.runAsync(sql, params);
+                perf.stop('subscribe-batch-write').log('subscribe-batch-write')
+                perf.stop('subscribe-batch').log('subscribe-batch')
+
             }
 
             if (onProgress) onProgress(processed, totalRows);
             if (batch.length < batchSize) break;
             offset += batchSize;
         }
-        // console.log('subscribed ', inserts, 'data points captured in hot db')
+        console.log('subscribed ', inserts, 'data points captured in hot db')
     }
 
     async clearDb() {
@@ -316,6 +336,11 @@ export class SqliteTickerApi extends TickerApi {
         if (!this.dbCold) {
             this.dbCold = await SQLite.openDatabaseAsync('market_data.sqlite');
             this.dbHot = await SQLite.openDatabaseAsync('market_data_runtime.sqlite');
+            await this.dbCold.execAsync('PRAGMA journal_mode = WAL');
+            await this.dbCold.execAsync('PRAGMA foreign_keys = ON');
+            await this.dbHot.execAsync('PRAGMA journal_mode = WAL');
+            await this.dbHot.execAsync('PRAGMA foreign_keys = ON');
+
             await this.createCacheTableIfNotExists()
             await this.createFullMktDataTable()
             await this.createHotMktDataTable()
@@ -491,9 +516,27 @@ export class SqliteTickerApi extends TickerApi {
         `);
     }
     async createFullMktIndex() {
-        await this.dbCold.execAsync(`
-            CREATE INDEX idx_symbol_date_time_${TABLE_MARKET_DATA_FULL} ON users(symbol, date, time);
-        `)
+        console.log('Creating index')
+        await Promise.all([
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol ON ${TABLE_MARKET_DATA_FULL}(symbol);
+            `),
+
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol_datetime  ON ${TABLE_MARKET_DATA_FULL}(symbol, datetime);
+            `),
+            this.dbCold.execAsync(`
+                CREATE INDEX IF NOT EXISTS idx_symbol_date_and_time  ON ${TABLE_MARKET_DATA_FULL}(symbol, date, time);
+            `)
+        ]).then(() => {
+            console.log('createFullMktIndex compelted ')
+        }).catch(e => {
+            console.log('Creating index failed', e.message)
+
+            e.message = "createFullMktIndex: " + e.message
+            this.onError && this.onError(e)
+        })
+
     }
     async createHotMktIndex() {
         await this.dbHot.execAsync(`
