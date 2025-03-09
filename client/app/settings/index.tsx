@@ -68,7 +68,7 @@ export function MetaData() {
         loadMetaInfo()
     }, [processComplete])
     useEventListener(Topic.INGEST_CSV_PROGRESS, ({ progress, total }) => {
-        console.log('Progress', progress, total, (progress / total) * 100)
+        // console.log('Progress', progress, total, (progress / total) * 100)
         if (progress >= 0) {
             if (progress == total) {
                 setProcessComplete((a) => (!a))
@@ -181,7 +181,7 @@ export function LoadCsv() {
         setErocessError(message)
     })
     useEventListener(Topic.INGEST_CSV_PROGRESS, ({ progress, total }) => {
-        console.log('Progress', progress, total, (progress / total) * 100)
+        // console.log('Progress', progress, total, (progress / total) * 100)
         if (progress >= 0) {
             setLoadProgress((progress / total) * 100)
             if (progress == total) {

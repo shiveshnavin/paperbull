@@ -42,7 +42,7 @@ export class SqliteTickerApi extends TickerApi {
         let isCancelled = false;
         if (setCancelHook) {
             setCancelHook(() => {
-                console.log("subscription cancelled");
+                // console.log("subscription cancelled");
                 isCancelled = true;
             });
         }
@@ -95,7 +95,7 @@ export class SqliteTickerApi extends TickerApi {
 
             for (const row of batch) {
                 if (isCancelled) {
-                    console.log("Operation cancelled. Exiting subscription loop.");
+                    // console.log("Operation cancelled. Exiting subscription loop.");
                     break;
                 }
 
@@ -137,7 +137,7 @@ export class SqliteTickerApi extends TickerApi {
             if (batch.length < batchSize) break;
             offset += batchSize;
         }
-        console.log('subscribed ', inserts, 'data points captured in hot db')
+        // console.log('subscribed ', inserts, 'data points captured in hot db')
     }
 
     async clearDb() {
@@ -245,7 +245,7 @@ export class SqliteTickerApi extends TickerApi {
                 row.time,
                 row.last_price
             ]);
-            console.log('Inserted in cache', row)
+            // console.log('Inserted in cache', row)
         }
     }
 
@@ -254,7 +254,7 @@ export class SqliteTickerApi extends TickerApi {
         if (cachedResults.length > 0) {
             return cachedResults.map(this.mapDbRowToTick);
         }
-        console.log('Missing from cache')
+        // console.log('Missing from cache')
 
         let query = `
             SELECT *
@@ -295,8 +295,8 @@ export class SqliteTickerApi extends TickerApi {
         `;
 
         const result: any = await this.dbHot.getAllAsync(query, this.symbols);
-        console.log(query, this.symbols)
-        console.log('result==>', result)
+        // console.log(query, this.symbols)
+        // console.log('result==>', result)
 
         let ticks = result.map(this.mapDbRowToTick);
         let snapshot = {
@@ -326,7 +326,7 @@ export class SqliteTickerApi extends TickerApi {
 
     async test() {
 
-        console.log('run test quer 5');
+        // console.log('run test quer 5');
 
         //@ts-ignore
         (this.dbHot.getAllAsync(`
@@ -345,7 +345,7 @@ export class SqliteTickerApi extends TickerApi {
         setCancelHook?: (cancelCallback: () => void) => void) {
         let isCancelled = false
         setCancelHook && setCancelHook(() => {
-            console.log('Ingestion cancelled')
+            // console.log('Ingestion cancelled')
             isCancelled = true
         })
         const path = file.uri
@@ -353,7 +353,7 @@ export class SqliteTickerApi extends TickerApi {
         console.log('Loading CSV from ', path)
 
         const fileInfo = await FileSystem.getInfoAsync(path);
-        console.log('fileInfo', fileInfo)
+        // console.log('fileInfo', fileInfo)
 
         if (!fileInfo.exists) {
             throw new Error(`File not found: ${path}`);

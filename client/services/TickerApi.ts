@@ -21,7 +21,6 @@ export class TickerApi {
     currentListenCallback: ((ticks: Tick[]) => void) | null = null;
     protected resolution: Resolution
     uiTimeframe: UIResolution
-    intervalId: number | null | any = null
 
     constructor(timeframe: Resolution = 'realtime') {
         this.resolution = timeframe
@@ -30,6 +29,7 @@ export class TickerApi {
 
 
     setSnapshot(snapshot: Snapshot) {
+        // console.log('setting snapshot', snapshot.time)
         this.snapshotPrev = this.snapshot
         this.snapshot = snapshot
     }
@@ -104,13 +104,16 @@ export class TickerApi {
         this.onError = onError
     }
 
+    stopped = true
     async stopSeek() {
-        this.intervalId && clearInterval(this.intervalId)
-        this.intervalId = null
+        this.stopped = true
+    }
+    private isStopped() {
+        return this.stopped
     }
 
     isPlaying() {
-        return this.intervalId != null
+        return !this.isStopped()
     }
 
     async getTicks(datetimefrom: number, datetimeto: number, onTick: (ticks: Tick[]) => Promise<void>)
@@ -136,12 +139,16 @@ export class TickerApi {
 
     async seekForward(date: string, time: string) {
         this.stopSeek()
-        this.intervalId = 1
+        this.stopped = false
         let curdateTime = toEpochMs((this.getCurrentSnapshot()).date, (this.getCurrentSnapshot()).time);
         let finaldateTime = toEpochMs(date, time);
         if (this.uiTimeframe == 'fastforward') {
+            console.log('seek fast fwd!!', curdateTime, '->', finaldateTime)
+
             await this.getTicks(curdateTime, finaldateTime, async (ticks) => {
-                if (this.intervalId == null) {
+                // console.log('fasting to', finaldateTime, ticks.length)
+
+                if (this.isStopped()) {
                     throw new Error('Seek stopped')
                 }
                 this.onTick && (await this.onTick(ticks, finaldateTime))
@@ -157,18 +164,51 @@ export class TickerApi {
             this.onTick && (await this.onTick([], finaldateTime))
 
         } else if (this.uiTimeframe == 'realtime') {
-            console.log('seek realtime!!', curdateTime, '->', finaldateTime)
+            // console.log('seek realtime!!', curdateTime, '->', finaldateTime)
             let loadNextMinute = async () => {
 
-                if (this.intervalId == null) {
+                if (this.isStopped()) {
                     return
                 }
                 if (curdateTime < finaldateTime) {
                     let nextHit = curdateTime + 1000
                     let fetchedcount = await this.getTicks(curdateTime, nextHit, async (ticks) => {
-                        ticks.forEach(t => {
-                            console.log('ticks realtime', new Date(t.datetime), t.last_price)
-                        })
+
+                        this.onTick && (await this.onTick(ticks, nextHit))
+                    }).catch(this.onError)
+                    // console.log('fetchedcount at ', new Date(curdateTime).toLocaleTimeString(), fetchedcount)
+                    if (fetchedcount == 0) {
+                        let fetchedcountNext = await this.getNextTicks(curdateTime, 1, async (ticks) => {
+                            ticks.forEach(t => {
+                                if (nextHit < t.datetime) {
+                                    nextHit = t.datetime
+                                }
+                                // console.log('getNextTicks realtime', new Date(t.datetime), t.last_price)
+                            })
+                            this.onTick && (await this.onTick(ticks, nextHit))
+                        }).catch(this.onError)
+                    }
+                    curdateTime = nextHit
+                    if (!this.isStopped())
+                        setTimeout(loadNextMinute, 100)
+                } else {
+                    this.stopSeek()
+                    this.onTick && (await this.onTick([], finaldateTime))
+                }
+            }
+            loadNextMinute()
+
+        } else if (this.uiTimeframe == 'minute') {
+            let loadNextMinute = async () => {
+
+                if (this.isStopped()) {
+                    return
+                }
+                if (curdateTime < finaldateTime) {
+                    let nextHit = curdateTime + 60 * 1000
+                    let fetchedcount = await this.getTicks(curdateTime, nextHit, async (ticks) => {
+                        // console.log('getTicks at ', new Date(curdateTime).toLocaleTimeString(), ticks)
+
                         this.onTick && (await this.onTick(ticks, nextHit))
                     }).catch(this.onError)
                     if (fetchedcount == 0) {
@@ -177,40 +217,19 @@ export class TickerApi {
                                 if (nextHit < t.datetime) {
                                     nextHit = t.datetime
                                 }
-                                console.log('getNextTicks realtime', new Date(t.datetime), t.last_price)
+                                // console.log('getNextTicks realtime', new Date(t.datetime), t.last_price)
                             })
                             this.onTick && (await this.onTick(ticks, nextHit))
                         }).catch(this.onError)
                     }
                     curdateTime = nextHit
-                    this.intervalId = setTimeout(loadNextMinute, 100)
+                    if (!this.isStopped())
+                        setTimeout(loadNextMinute, 1000)
                 } else {
                     this.stopSeek()
                     this.onTick && (await this.onTick([], finaldateTime))
                 }
             }
-            this.intervalId = 1
-            loadNextMinute()
-
-        } else if (this.uiTimeframe == 'minute') {
-            let loadNextMinute = async () => {
-
-                if (this.intervalId == null) {
-                    return
-                }
-                if (curdateTime < finaldateTime) {
-                    let nextHit = curdateTime + 60 * 1000
-                    await this.getTicks(curdateTime, nextHit, async (ticks) => {
-                        this.onTick && (await this.onTick(ticks, nextHit))
-                    }).catch(this.onError)
-                    curdateTime = nextHit
-                    this.intervalId = setTimeout(loadNextMinute, 1000)
-                } else {
-                    this.stopSeek()
-                    this.onTick && (await this.onTick([], finaldateTime))
-                }
-            }
-            this.intervalId = 1
             loadNextMinute()
         }
     }

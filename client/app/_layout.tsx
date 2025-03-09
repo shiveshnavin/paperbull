@@ -91,7 +91,7 @@ export default function RootLayout() {
               </View>
               <EventListeners />
             </SafeAreaView>
-            <AppBottomBar />
+            <AppBottomBar tickeApi={context.tickApi} />
           </ThemeContext.Provider>
         </AppContext.Provider>
       </Provider>

@@ -38,7 +38,8 @@ export default function Watchlist() {
   })
   let time = parseTime(tickerApi.getCurrentSnapshot().time)
   if (tickerApi.getCurrentSnapshot()?.ticks?.length > 0) {
-    let tick = tickerApi.getCurrentSnapshot()?.ticks.sort((b, a) => (a.datetime - b.datetime))[0]
+    let tick = tickerApi.getCurrentSnapshot()?.ticks
+      ?.reduce((max, tick) => (tick.datetime > max.datetime ? tick : max));
     time = tick.getTimeFormatted()
   }
   return (
@@ -61,7 +62,8 @@ export default function Watchlist() {
           )
         }
         {
-          snapshot?.ticks?.map(t => {
+          //@ts-ignore
+          [...(snapshot?.ticks || [])].sort((a, b) => a.symbol.localeCompare(b.symbol))?.map(t => {
             return (
               <ScipDisplay key={t.symbol + '' + t.datetime} tick={t} prevTick={new Tick({
                 ...t,

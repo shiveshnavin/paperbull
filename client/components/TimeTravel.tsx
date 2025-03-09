@@ -18,7 +18,7 @@ export function TimeTravel({ onDismiss }: any) {
     const [enabled, setEnabled] = useState(false)
     const publishEvent = useEventPublisher()
 
-
+    // console.log('timetravel tickerApi.getCurrentSnapshot()', tickerApi.getCurrentSnapshot().ticks.at(0)?.getTimeFormatted())
     const [preDateValue, setPreDateValue] = useState(tickerApi.getCurrentSnapshot().date);
     const [dateValue, setDateValue] = useState(tickerApi.getCurrentSnapshot().date);
 
@@ -40,10 +40,17 @@ export function TimeTravel({ onDismiss }: any) {
     })
 
     useEffect(() => {
+        tickerApi.getTimeFrames().then((st) => {
+            setTimes(st)
+            setPreTimeValue(st.indexOf(tickerApi.getCurrentSnapshot().time) > -1 ? st.indexOf(tickerApi.getCurrentSnapshot().time) : 0)
+            setTimeValue(st.indexOf(tickerApi.getCurrentSnapshot().time) > -1 ? st.indexOf(tickerApi.getCurrentSnapshot().time) : 0)
+        })
+    }, [tickerApi.getCurrentSnapshot()])
+
+    useEffect(() => {
         Storage.getKeyAsync('preferred_ui_timeframe').then((t) => {
             setUITimeFrame(t as UIResolution || "realtime")
         })
-        tickerApi.getTimeFrames().then(setTimes)
 
         tickerApi.
             getAvailableSymbols()

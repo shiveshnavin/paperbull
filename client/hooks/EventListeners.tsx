@@ -29,7 +29,7 @@ export function EventListeners() {
             let dummyTick = new Tick({
                 datetime: dateTime
             })
-            // console.log('Reieceved', ticks.length, 'ticks', ticks)
+            // console.log('Reieceved in listener', dateTime, ticks.length)
             if (ticks.length == 0) {
 
                 let dummySnapshot = {
@@ -49,10 +49,8 @@ export function EventListeners() {
             let uiTimeFrame = tickerApi.uiTimeframe
             if (uiTimeFrame == 'minute') {
                 for (let tick of ticks) {
-                    if (tick.datetime < (curFrameDatetimems + $1Minute)) {
-                        frame.set(tick.symbol, tick)
-                    }
-                    else {
+                    frame.set(tick.symbol, tick)
+                    if (tick.datetime >= (curFrameDatetimems + $1Minute)) {
                         curFrameDatetimems = tick.datetime
                         let snap = {
                             date: tick.getDate(),
@@ -60,6 +58,8 @@ export function EventListeners() {
                             ticks: Array.from(frame.values())
                         } as Snapshot
                         tickerApi.setSnapshot(snap)
+                        // console.log('publish snap fom listener', snap.ticks.length, 'ticks', snap.ticks)
+
                         publishEvent(Topic.SNAPSHOT_UPDATE, snap)
                     }
                 }
@@ -70,14 +70,13 @@ export function EventListeners() {
                 } as Snapshot
                 tickerApi.setSnapshot(snap)
                 publishEvent(Topic.SNAPSHOT_UPDATE, snap)
+                // console.log('publish snap fom listener afer arr', snap.ticks.length, 'ticks', snap.ticks)
 
             }
             else if (uiTimeFrame == 'realtime') {
                 for (let tick of ticks) {
-                    if (tick.datetime < (curFrameDatetimems + $1Minute)) {
-                        frame.set(tick.symbol, tick)
-                    }
-                    else {
+                    frame.set(tick.symbol, tick)
+                    if (tick.datetime >= (curFrameDatetimems + $100Ms)) {
                         curFrameDatetimems = tick.datetime
                         let snap = {
                             date: tick.getDate(),
@@ -98,10 +97,8 @@ export function EventListeners() {
             }
             else if (uiTimeFrame == 'fastforward') {
                 for (let tick of ticks) {
-                    if (tick.datetime < (curFrameDatetimems + $30mins)) {
-                        frame.set(tick.symbol, tick)
-                    }
-                    else {
+                    frame.set(tick.symbol, tick)
+                    if (tick.datetime >= (curFrameDatetimems + $30mins)) {
                         curFrameDatetimems = tick.datetime
                         let snap = {
                             date: tick.getDate(),
@@ -136,7 +133,7 @@ export function EventListeners() {
     useEventListener(Topic.INGEST_CSV, async (file: PickedFile) => {
         let sqliteTickerApi = tickerApi as SqliteTickerApi
         await sqliteTickerApi.init()
-        console.log('Processing file', file)
+        // console.log('Processing file', file)
 
         sqliteTickerApi.loadFromCsv(file,
             (progress, total) => {
@@ -148,7 +145,7 @@ export function EventListeners() {
                 setIngestCsvCancel(() => onCancel)
             })
             .then(() => {
-                tickerApi.getDataSize('2025-03-01', '0915').then(console.log)
+                // tickerApi.getDataSize('2025-03-01', '0915').then(console.log)
             })
             .catch(e => {
                 // console.log('Error loading CSV', e)
