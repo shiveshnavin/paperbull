@@ -46,6 +46,10 @@
         {
           "iCloudContainerEnvironment": "Production"
         }
+      ],
+      "expo-background-task",
+      [
+        "./plugins/expo-foreground-actions"
       ]
     ],
     "experiments": {
