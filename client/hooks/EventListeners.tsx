@@ -180,6 +180,7 @@ export function EventListeners() {
                 })
             })
             .then((result: SqliteFileMeta) => {
+                tickerApi.getAvailableSymbols(undefined, true)
                 Storage.getKeyAsync('sqlite_datasets')
                     .then((listStr) => {
                         let list = []

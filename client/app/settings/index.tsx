@@ -45,12 +45,12 @@ export function MetaData() {
     const [size, setSize] = useState(0)
     const [availableSymbols, setAvailableSymbols] = useState<Tick[]>([])
     const [availableDates, setAvailableDates] = useState<string[]>([])
-    function loadMetaInfo() {
+    function loadMetaInfo(skipCache = false) {
         setLoading(true)
         Promise.all([
             tickerApi.getDataSize().then(setSize),
             tickerApi.
-                getAvailableSymbols()
+                getAvailableSymbols(undefined, skipCache)
                 .then((symbols) => {
                     setAvailableSymbols(symbols)
                     let dates = new Set<string>()
@@ -68,7 +68,7 @@ export function MetaData() {
         })
     }
     useEffect(() => {
-        loadMetaInfo()
+        loadMetaInfo(false)
     }, [processComplete])
     useEventListener(Topic.INGEST_CSV_PROGRESS, ({ progress, total }) => {
         // console.log('Progress', progress, total, (progress / total) * 100)
@@ -145,7 +145,7 @@ export function MetaData() {
                 }
             </Expand>
             <TransparentButton onPress={() => {
-                loadMetaInfo()
+                loadMetaInfo(true)
             }}>Refresh</TransparentButton>
 
             {

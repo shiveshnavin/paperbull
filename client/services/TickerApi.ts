@@ -241,7 +241,7 @@ export class TickerApi {
         return {} as Snapshot
     }
 
-    async getAvailableSymbols(date?: string): Promise<Tick[]> {
+    async getAvailableSymbols(date?: string, skipCache?: boolean): Promise<Tick[]> {
         return []
     }
 

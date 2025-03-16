@@ -58,7 +58,6 @@ export class SqliteTickerApi extends TickerApi {
             for (const ds of datasets) {
                 try {
                     let info = await FileSystem.getInfoAsync(ds.file);
-                    console.log('info', info);
                     if (info.exists) {
                         let db = await SQLite.openDatabaseAsync(ds.file);
                         this.datasets.push({ ...ds, db });
@@ -69,8 +68,8 @@ export class SqliteTickerApi extends TickerApi {
                 }
             }
         }
-        console.log('saved dataests', datasets)
-        console.log('healthy dataests', healthyDatasets)
+        // console.log('saved dataests', datasets)
+        // console.log('healthy dataests', healthyDatasets)
         return healthyDatasets
     }
 
@@ -230,8 +229,12 @@ export class SqliteTickerApi extends TickerApi {
         console.log('subscribed ', inserts, 'data points captured in hot db')
     }
 
-    async clearDb() {
+    async clearCache() {
         await this.dbHot?.execAsync(`DELETE from symbol_cache WHERE 1 = 1`)
+    }
+
+    async clearDb() {
+        await this.clearCache()
         return Promise.all([
             this.dbCold?.execAsync(`DROP TABLE IF EXISTS ${TABLE_MARKET_DATA_FULL}`),
             this.dbHot?.execAsync(`DROP TABLE IF EXISTS ${TABLE_MARKET_DATA_RUNTIME}`)
@@ -321,7 +324,18 @@ export class SqliteTickerApi extends TickerApi {
             query = query + ` AND date = '${time}'`
         }
         const result: any = await this.dbCold.getFirstAsync(query);
-        return result.cnt;
+        let count = result.cnt;
+        for (let dataset of this.datasets) {
+            try {
+                let db = dataset.db
+                let resultForDataset: any = await db.getFirstAsync(query);
+                count += (resultForDataset.cnt || 0)
+            } catch (e: any) {
+                console.log(`Error in getDataSize for ${dataset.dates}`, e.message)
+            }
+        }
+
+        return count;
     }
     private async getFromCache(date?: string): Promise<MarketDataRow[]> {
         const query = date
@@ -332,29 +346,33 @@ export class SqliteTickerApi extends TickerApi {
     }
 
     private async updateCache(rows: MarketDataRow[]): Promise<void> {
-        const query = `
-        INSERT OR REPLACE INTO ${TABLE_SYMBOL_CACHE} (symbol, datetime, date, time, last_price)
-        VALUES (?, ?, ?, ?, ?);
-    `;
-        for (const row of rows) {
-            await this.dbHot.runAsync(query, [
-                row.symbol,
-                row.datetime,
-                row.date,
-                row.time,
-                row.last_price
-            ]);
-            // console.log('Inserted in cache', row)
-        }
+        const placeholders = rows.map(() => '(?, ?, ?, ?, ?)').join(',');
+        const sql = `
+            INSERT OR REPLACE INTO ${TABLE_SYMBOL_CACHE} (symbol, datetime, date, time, last_price) 
+            VALUES ${placeholders}
+        `;
+
+        const params = rows.flatMap(row => [
+            row.symbol,
+            row.datetime,
+            row.date,
+            row.time,
+            row.last_price,
+        ]);
+
+        await this.dbHot.runAsync(sql, params);
     }
 
-    async getAvailableSymbols(date?: string): Promise<Tick[]> {
+    async getAvailableSymbols(date?: string, skipCache?: boolean): Promise<Tick[]> {
         const cachedResults = await this.getFromCache(date);
-        if (cachedResults.length > 0) {
+
+        // console.log('Cached symbols', cachedResults.length)
+        if (cachedResults.length > 0 && !skipCache) {
             return cachedResults.map(this.mapDbRowToTick);
         }
-        // console.log('Missing from cache')
-
+        if (skipCache) {
+            await this.clearCache()
+        }
         let query = `
             SELECT *
                 FROM ${TABLE_MARKET_DATA_FULL}
@@ -365,9 +383,29 @@ export class SqliteTickerApi extends TickerApi {
                     GROUP BY symbol
                 );
         `;
-        const result: MarketDataRow[] = await this.dbCold.getAllAsync(query);
-        const ticks = result.map(this.mapDbRowToTick);
-        await this.updateCache(result);
+        let result: MarketDataRow[] = await this.dbCold.getAllAsync(query);
+        let datasetForDates = this.datasets.filter(ds => !date || ds.dates.includes(date))
+        console.log(`search for symbols in `, datasetForDates.length, 'datasets')
+
+        for (let dataset of datasetForDates) {
+            try {
+                let db = dataset.db
+                let resultForDataset: MarketDataRow[] = await db.getAllAsync(query);
+                console.log(`result in getAvailableSymbols for ${dataset.dates}`, resultForDataset.length)
+                result.push(...resultForDataset)
+            } catch (e: any) {
+                console.log(`Error in getAvailableSymbols for ${dataset.dates}`, e.message)
+            }
+        }
+        console.log('got total synbols', result.length)
+        const uniqueResult = Array.from(
+            new Map(result.map(obj => [obj.symbol, obj])).values()
+        );
+        console.log('got total unqiue synbols', uniqueResult.length)
+
+        const ticks = uniqueResult.map(this.mapDbRowToTick);
+        await this.updateCache(uniqueResult);
+        console.log('updating cache', uniqueResult.length)
 
         return ticks;
     }
@@ -411,7 +449,13 @@ export class SqliteTickerApi extends TickerApi {
         return new Tick(row)
     }
 
-
+    async runOpOnDataset(date: string, op: (db: SQLiteDatabase) => Promise<any>): Promise<any> {
+        let dataset = this.datasets.find(ds => ds.dates.includes(date))
+        if (!dataset) {
+            return undefined
+        }
+        return op(dataset.db)
+    }
 
     async loadFromSqlite(file: PickedFile,
         onProgress?: (progress: number, total: number) => void) {
