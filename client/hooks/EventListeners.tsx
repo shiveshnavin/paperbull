@@ -124,7 +124,13 @@ export function EventListeners() {
 
         }, (e) => {
             console.log(e)
-        })
+        }, (ev, data) => {
+            if (ev == 'stop-seek') {
+                publishEvent(Topic.STOP_SEEK, data)
+                Storage.setKeyAsync('snapshot', JSON.stringify(data as Snapshot))
+            }
+        }
+        )
     }, [tickerApi])
 
     useEventListener(Topic.TIME_TRAVEL, async () => {

@@ -11,6 +11,7 @@ import { PaperbullToolbar } from '../components/PaperbullToolbar';
 import { parseTime } from '../components/TimeTravel';
 import { SqliteTickerApi } from '../services/SqliteTickerApi';
 import { SearchBox } from './settings';
+import { ReactUtils } from '../utils/ReactUtils';
 
 export default function Watchlist() {
   const theme = useContext(ThemeContext)
@@ -114,7 +115,7 @@ export default function Watchlist() {
           [...(snapshot?.ticks || [])]
             .sort((a, b) => a.symbol.localeCompare(b.symbol))?.map(t => {
               return (
-                <ScipDisplay key={t.symbol + '' + t.datetime} tick={t} prevTick={new Tick({
+                <ScipDisplay key={t.symbol + '' + t.datetime + ReactUtils.getRandomNumber(0, 100)} tick={t} prevTick={new Tick({
                   ...t,
                   last_price: t.last_price - 10
                 })} />

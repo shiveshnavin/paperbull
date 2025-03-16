@@ -7,6 +7,7 @@ export type Snapshot = {
     ticks: Tick[]
 }
 
+export type TickerEventListener = undefined | null | ((evName: 'stop-seek' | 'start-seek' | 'snapshot' | 'error', ticks?: Tick[] | Snapshot | undefined) => void)
 export type Resolution = "realtime" | "1s" | "10s" | "1m" | "10m"
 /**
  * realtime - send ticks to ui every 100ms, process all ticks for orders
@@ -18,7 +19,6 @@ export class TickerApi {
     protected snapshotPrev: Snapshot = {} as Snapshot
     protected snapshot: Snapshot = {} as Snapshot
     protected symbols: string[] = [];
-    currentListenCallback: ((ticks: Tick[]) => void) | null = null;
     protected resolution: Resolution
     uiTimeframe: UIResolution
 
@@ -97,15 +97,22 @@ export class TickerApi {
         return this.symbols
     }
 
+
+    onEvent: TickerEventListener = null
     onTick?: (ticks: Tick[], dateTime: number) => Promise<void> = undefined
     onError?: (r: Error) => void = undefined
-    async listen(onTick: (ticks: Tick[], dateTime: number) => Promise<void>, onError?: (e: Error) => void) {
+    async listen(
+        onTick: (ticks: Tick[], dateTime: number) => Promise<void>,
+        onError?: (e: Error) => void,
+        onEvent?: TickerEventListener) {
         this.onTick = onTick
         this.onError = onError
+        this.onEvent = onEvent
     }
 
     stopped = true
     async stopSeek() {
+        this.onEvent && this.onEvent('stop-seek', this.snapshot)
         this.stopped = true
     }
     private isStopped() {

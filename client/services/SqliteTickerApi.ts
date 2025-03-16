@@ -431,9 +431,9 @@ export class SqliteTickerApi extends TickerApi {
             AND m.datetime = latest.max_datetime
         `;
 
-        const result: any = await this.dbCold.getAllAsync(query, this.symbols);
+        const result: any = await this.runOpOnDataset(date, db => db.getAllAsync(query, this.symbols));
         // console.log(query, this.symbols)
-        // console.log('result==>', result)
+        console.log('Snapshot Results', result.length)
 
         let ticks = result.map(this.mapDbRowToTick);
         let snapshot = {
@@ -451,9 +451,11 @@ export class SqliteTickerApi extends TickerApi {
 
     async runOpOnDataset(date: string, op: (db: SQLiteDatabase) => Promise<any>): Promise<any> {
         let dataset = this.datasets.find(ds => ds.dates.includes(date))
+        console.log('matching dataset', this.datasets.find(ds => ds.dates.includes(date))?.dates)
         if (!dataset) {
-            return undefined
+            return op(this.dbCold)
         }
+        console.log('Running OP on dataset', dataset.dates)
         return op(dataset.db)
     }
 

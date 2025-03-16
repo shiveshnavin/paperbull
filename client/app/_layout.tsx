@@ -15,7 +15,8 @@ import { store } from '../components/store';
 import { SqliteTickerApi } from '../services/SqliteTickerApi';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View } from 'react-native';
-import { Resolution, UIResolution } from '../services/TickerApi';
+import { Resolution, Snapshot, UIResolution } from '../services/TickerApi';
+import { Tick } from '../services/models/Tick';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,7 +30,9 @@ export default function RootLayout() {
     let tickerApi = new SqliteTickerApi()
     Storage.getKeyAsync('snapshot').then(snapshot => {
       if (snapshot) {
-        tickerApi.setSnapshot(JSON.parse(snapshot))
+        let snap = JSON.parse(snapshot) as Snapshot
+        snap.ticks = snap.ticks.map((t: any) => new Tick(t))
+        tickerApi.setSnapshot(snap)
       }
     })
     Storage.getKeyAsync('symbols').then(symbols => {

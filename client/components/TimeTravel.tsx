@@ -224,15 +224,10 @@ export function TimeTravel({ onDismiss }: any) {
                                     )
                                 }}
                                 onPress={() => {
-                                    if ((timeValue) < (prevTimeValue)) {
-                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[timeValue]).then(snapshot => {
-                                            publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
-                                        })
-                                    } else {
-                                        tickerApi.getSnapShot(tickerApi.getCurrentSnapshot().date, times[timeValue]).then(snapshot => {
-                                            publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
-                                        })
-                                    }
+                                    tickerApi.getSnapShot(dateValue, times[timeValue]).then(snapshot => {
+                                        Storage.setKeyAsync('snapshot', JSON.stringify(tickerApi.getCurrentSnapshot()))
+                                        publishEvent(Topic.SNAPSHOT_UPDATE, snapshot)
+                                    })
                                     setPreTimeValue(timeValue)
                                 }}>Seek</ButtonView>
                             <ButtonView
