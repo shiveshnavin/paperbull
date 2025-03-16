@@ -172,13 +172,13 @@ export class TickerApi {
 
         } else if (this.uiTimeframe == 'realtime') {
             // console.log('seek realtime!!', curdateTime, '->', finaldateTime)
-            let loadNextMinute = async () => {
+            let loadNextSecond = async () => {
 
                 if (this.isStopped()) {
                     return
                 }
                 if (curdateTime < finaldateTime) {
-                    let nextHit = curdateTime + 1000
+                    let nextHit = curdateTime + 500
                     let fetchedcount = await this.getTicks(curdateTime, nextHit, async (ticks) => {
                         this.onTick && (await this.onTick(ticks, nextHit))
                     }).catch(this.onError)
@@ -196,13 +196,13 @@ export class TickerApi {
                     }
                     curdateTime = nextHit
                     if (!this.isStopped())
-                        setTimeout(loadNextMinute, 100)
+                        setTimeout(loadNextSecond, 500)
                 } else {
                     this.stopSeek()
                     this.onTick && (await this.onTick([], finaldateTime))
                 }
             }
-            loadNextMinute()
+            loadNextSecond()
 
         } else if (this.uiTimeframe == 'minute') {
             let loadNextMinute = async () => {

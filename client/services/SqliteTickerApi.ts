@@ -269,6 +269,20 @@ export class SqliteTickerApi extends TickerApi {
 
         return totalFetched;
     }
+
+    generateDateArray(datetimeFrom: number, datetimeTo: number) {
+        const fromDate = new Date(datetimeFrom);
+        const toDate = new Date(datetimeTo);
+        const dateArray = [];
+
+        while (fromDate <= toDate) {
+            dateArray.push(fromDate.toISOString().split('T')[0]); // Format as "YYYY-MM-DD"
+            fromDate.setDate(fromDate.getDate() + 1); // Move to next day
+        }
+
+        return dateArray;
+    }
+
     async getTicks(datetimefrom: number, datetimeto: number, onTick: (ticks: Tick[]) => Promise<void>)
         : Promise<number> {
 
@@ -298,7 +312,12 @@ export class SqliteTickerApi extends TickerApi {
             // console.log('query', dum.getTime(), dum2.getTime(), query, this.symbols)
 
             perf.start('get-ticks')
-            const result: any = await this.dbCold.getAllAsync(query, this.symbols);
+            let dates = this.generateDateArray(datetimefrom, datetimeto)
+            let result: any[] = [];
+            for (let date of dates) {
+                let dateResult = await this.runOpOnDataset(date, db => db.getAllAsync(query, this.symbols))
+                result = result.concat(dateResult)
+            }
             let ticks = result.map(this.mapDbRowToTick);
             perf.stop('get-ticks').log('get-ticks')
 
@@ -432,7 +451,7 @@ export class SqliteTickerApi extends TickerApi {
         `;
 
         const result: any = await this.runOpOnDataset(date, db => db.getAllAsync(query, this.symbols));
-        // console.log(query, this.symbols)
+        console.log(query, this.symbols)
         console.log('Snapshot Results', result.length)
 
         let ticks = result.map(this.mapDbRowToTick);
@@ -451,11 +470,11 @@ export class SqliteTickerApi extends TickerApi {
 
     async runOpOnDataset(date: string, op: (db: SQLiteDatabase) => Promise<any>): Promise<any> {
         let dataset = this.datasets.find(ds => ds.dates.includes(date))
-        console.log('matching dataset', this.datasets.find(ds => ds.dates.includes(date))?.dates)
+        // console.log('matching dataset', this.datasets.find(ds => ds.dates.includes(date))?.dates)
         if (!dataset) {
             return op(this.dbCold)
         }
-        console.log('Running OP on dataset', dataset.dates)
+        // console.log('Running OP on dataset', dataset.dates)
         return op(dataset.db)
     }
 

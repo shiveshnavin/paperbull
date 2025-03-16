@@ -72,9 +72,10 @@ export default function Watchlist() {
   let time = parseTime(tickerApi.getCurrentSnapshot().time)
   let date = (tickerApi.getCurrentSnapshot().date)
   if (tickerApi.getCurrentSnapshot()?.ticks?.length > 0) {
-    let tick = tickerApi.getCurrentSnapshot()?.ticks
+    let tick = ReactUtils.deduplicateByKey('symbol', tickerApi.getCurrentSnapshot()?.ticks)
       ?.reduce((max, tick) => (tick.datetime > max.datetime ? tick : max));
-    time = tick.getTimeFormatted()
+    if (tick)
+      time = tick.getTimeFormatted()
   }
   return (
     <VPage style={styles.container}>
@@ -112,7 +113,7 @@ export default function Watchlist() {
         </PressableView>
         {
           //@ts-ignore
-          [...(snapshot?.ticks || [])]
+          [...(ReactUtils.deduplicateByKey('symbol', snapshot?.ticks) || [])]
             .sort((a, b) => a.symbol.localeCompare(b.symbol))?.map(t => {
               return (
                 <ScipDisplay key={t.symbol + '' + t.datetime + ReactUtils.getRandomNumber(0, 100)} tick={t} prevTick={new Tick({

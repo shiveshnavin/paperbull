@@ -18,6 +18,20 @@ function base64ToBlob(base64: string): Blob {
     return new Blob([uintArray], { type: mime });
 }
 export const ReactUtils = {
+
+    deduplicateByKey<T>(key: string, objectArray?: T[]): T[] | undefined {
+        if (!objectArray) {
+            return undefined
+        }
+        const seen = new Set();
+        return objectArray.filter((obj: any) => {
+            if (seen.has(obj[key])) return false;
+            seen.add(obj[key]);
+            return true;
+        });
+    },
+
+
     toEpochMs(date: string, time: string) {
         return new Date(`${date}T${time.slice(0, 2)}:${time.slice(2, 4)}:00.000Z`).getTime()
     },
