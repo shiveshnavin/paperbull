@@ -11,9 +11,9 @@ import { PerformanceRecorder } from '../utils/PerformanceRecorder';
 const CHUNK_SIZE = 512 * 1024; // 64KB chunks
 const BATCH_SIZE = 200;    // Number of records per insert batch
 
-const TABLE_MARKET_DATA_FULL = 'market_data'
+const TABLE_MARKET_DATA_FULL = 'microticks_export'
 const TABLE_SYMBOL_CACHE = 'symbol_cache'
-const TABLE_MARKET_DATA_RUNTIME = 'market_data_runtime'
+const TABLE_MARKET_DATA_RUNTIME = 'microticks_export_runtime'
 
 export type MarketDataRow = {
     symbol: string
@@ -23,11 +23,27 @@ export type MarketDataRow = {
     last_price: number
 }
 export class SqliteTickerApi extends TickerApi {
+    datasets: SQLiteDatabase[] = [];
     dbCold!: SQLiteDatabase;
     dbHot!: SQLiteDatabase;
 
     constructor(timeframe: Resolution = 'realtime') {
         super(timeframe)
+    }
+
+    async init(dbPath?: string) {
+        if (!this.dbCold) {
+            this.dbCold = await SQLite.openDatabaseAsync(dbPath || 'market_data.sqlite');
+            this.dbHot = await SQLite.openDatabaseAsync('market_data_runtime.sqlite');
+            await this.dbCold.execAsync('PRAGMA journal_mode = WAL');
+            await this.dbCold.execAsync('PRAGMA foreign_keys = ON');
+
+            await this.createCacheTableIfNotExists()
+            await this.createFullMktDataTable()
+            await this.createHotMktDataTable()
+            await this.createFullMktIndex()
+            await this.createHotMktIndex()
+        }
     }
 
     async subscribe(
@@ -313,10 +329,10 @@ export class SqliteTickerApi extends TickerApi {
 
         let query = `
             SELECT *
-                FROM market_data
+                FROM ${TABLE_MARKET_DATA_FULL}
                 WHERE (symbol, datetime) IN (
                     SELECT symbol, MAX(datetime)
-                    FROM market_data
+                    FROM ${TABLE_MARKET_DATA_FULL}
                     ${date ? `WHERE date = '${date}'` : ''}  
                     GROUP BY symbol
                 );
@@ -367,19 +383,28 @@ export class SqliteTickerApi extends TickerApi {
         return new Tick(row)
     }
 
-    async init() {
-        if (!this.dbCold) {
-            this.dbCold = await SQLite.openDatabaseAsync('market_data.sqlite');
-            this.dbHot = await SQLite.openDatabaseAsync('market_data_runtime.sqlite');
-            await this.dbCold.execAsync('PRAGMA journal_mode = WAL');
-            await this.dbCold.execAsync('PRAGMA foreign_keys = ON');
 
-            await this.createCacheTableIfNotExists()
-            await this.createFullMktDataTable()
-            await this.createHotMktDataTable()
-            await this.createFullMktIndex()
-            await this.createHotMktIndex()
-        }
+
+    async loadFromSqlite(file: PickedFile,
+        onProgress?: (progress: number, total: number) => void) {
+        let fileName = file.name
+        let fileUri = file.uri
+        onProgress && onProgress(0, 1)
+        const destinationUri = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.copyAsync({
+            from: fileUri,
+            to: destinationUri,
+        });
+
+        this.dbCold = await SQLite.openDatabaseAsync(destinationUri || 'market_data.sqlite');
+        const countQuery = `
+        SELECT COUNT(*) as count 
+        FROM ${TABLE_MARKET_DATA_FULL} 
+      `;
+        const countResult: any[] = await this.dbCold.getAllAsync(countQuery);
+        let totalRows = countResult[0].count;
+        onProgress && onProgress(totalRows, totalRows)
+
     }
 
     async test() {
@@ -502,7 +527,7 @@ export class SqliteTickerApi extends TickerApi {
     async insertBatch(batch: any[]) {
         if (batch.length === 0) return;
         const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(',');
-        const sql = `INSERT INTO market_data (symbol, datetime, date, time, last_price) VALUES ${placeholders}`;
+        const sql = `INSERT INTO ${TABLE_MARKET_DATA_FULL} (symbol, datetime, date, time, last_price) VALUES ${placeholders}`;
 
         const params = batch.flatMap(record => [
             record.symbol,

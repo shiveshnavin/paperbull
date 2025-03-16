@@ -17,7 +17,7 @@ export function EventListeners() {
     const publishEvent = useEventPublisher()
 
     useEffect(() => {
-        tickerApi.getCurrentSnapshot().ticks.forEach(t => {
+        tickerApi.getCurrentSnapshot()?.ticks?.forEach(t => {
             frame.set(t.symbol, t)
         })
         let curFrameDatetimems: number = 0
@@ -134,6 +134,13 @@ export function EventListeners() {
         ingestCsvCancel && ingestCsvCancel()
         publishEvent(Topic.INGEST_CSV_PROGRESS, { progress: -1, total: 1 })
     })
+
+
+
+
+
+
+
     useEventListener(Topic.INGEST_CSV, async (file: PickedFile) => {
         let sqliteTickerApi = tickerApi as SqliteTickerApi
         await sqliteTickerApi.init()
@@ -158,6 +165,31 @@ export function EventListeners() {
                 })
             })
     })
+
+
+    useEventListener(Topic.INGEST_SQLITE, async (file: PickedFile) => {
+        let sqliteTickerApi = tickerApi as SqliteTickerApi
+        await sqliteTickerApi.init()
+        // console.log('Processing file', file)
+
+        sqliteTickerApi.loadFromSqlite(file,
+            (progress, total) => {
+                publishEvent(Topic.INGEST_SQLITE_PROGRESS, {
+                    progress,
+                    total
+                })
+            })
+            .then(() => {
+                tickerApi.getDataSize('2025-03-12', '0915').then(console.log)
+            })
+            .catch(e => {
+                // console.log('Error loading CSV', e)
+                publishEvent(Topic.INGEST_SQLITE_ERROR, {
+                    message: 'Error importing market data. ' + e.message
+                })
+            })
+    })
+
 
 
 

@@ -1,4 +1,4 @@
-import { BottomSheet, ButtonView, Caption, CardView, CompositeTextInputView, DropDownView, Expand, HBox, KeyboardAvoidingScrollView, LoadingButton, PressableView, ProgressBarView, Spinner, Storage, Subtitle, SwitchView, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
+import { BottomSheet, ButtonView, Caption, CardView, Center, CompositeTextInputView, DropDownView, Expand, HBox, KeyboardAvoidingScrollView, LoadingButton, PressableView, ProgressBarView, Spinner, Storage, Subtitle, SwitchView, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
 import { useStyle } from "../../components/style";
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { Button, FlatList } from "react-native";
@@ -21,6 +21,7 @@ export default function Settings() {
         <VPage style={styles.container}>
             <TransparentCenterToolbar title="Settings" />
             <KeyboardAvoidingScrollView>
+                <LoadSqlite />
                 <LoadCsv />
                 <MetaData />
             </KeyboardAvoidingScrollView>
@@ -120,9 +121,7 @@ export function MetaData() {
                     paddingStart: 0,
                     marginStart: -4
                 }}>
-                <TextView>
-                    Click on any of the below dates to replay that day.
-                </TextView>
+
                 {
                     availableDates.map((a, idx) => {
                         return (
@@ -306,7 +305,7 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone, onSubsc
     };
 
     return (
-        <VBox>
+        <VBox key="searchbox">
 
             {
                 loadProgress == -1 && (
@@ -429,4 +428,82 @@ export function SearchBox({ symbols, selectedSymbols, tickerApi, onDone, onSubsc
             }
         </VBox>
     );
+}
+
+
+export function LoadSqlite() {
+    const theme = useContext(ThemeContext)
+    const styles = useStyle(theme)
+    const [loadProgress, setLoadProgress] = useState(-1)
+    const { context } = useContext(AppContext)
+    const [processComplete, setProcessComplete] = useState<String | undefined>(undefined)
+    const [processError, setErocessError] = useState<String | undefined>(undefined)
+    const publisher = useEventPublisher()
+    const [clear, setClear] = useState(false)
+
+
+    useEventListener(Topic.INGEST_SQLITE_ERROR, ({ message }) => {
+        setErocessError(message)
+    })
+    useEventListener(Topic.INGEST_SQLITE_PROGRESS, ({ progress, total }) => {
+        // console.log('Progress', progress, total, (progress / total) * 100)
+        if (progress >= 0) {
+            setLoadProgress((progress / total) * 100)
+            if (progress == total) {
+                setProcessComplete(`Imported ${progress} data points.`)
+                setLoadProgress(-1)
+            }
+        }
+        else if (progress < 0) {
+            setLoadProgress(-1)
+        }
+    })
+    return (
+        <CardView key="loadcsv">
+            <Subtitle>Load Sqlite</Subtitle>
+            <TextView>Select a sqlite file containing the market data.</TextView>
+
+            {
+                processComplete && (
+                    <TextView style={{
+                        color: theme.colors.success
+                    }}>{processComplete}</TextView>
+                )
+            }
+            {
+                processError && (
+                    <TextView style={{
+                        color: theme.colors.critical
+                    }}>{processError}</TextView>
+                )
+            }
+            {
+                loadProgress > -1 ? (
+                    <VBox>
+                        <Center>
+                            <Spinner />
+                        </Center>
+                    </VBox>
+                ) : (
+                    <FilePicker
+                        auto={false}
+                        text="Select File"
+                        onFiles={(files) => {
+                            (clear ? (context.tickApi as SqliteTickerApi).clearDb() : Promise.resolve(true))
+                                .then(() => {
+                                    setProcessComplete(undefined)
+                                    setErocessError(undefined)
+                                    if (files.length > 0)
+                                        publisher(Topic.INGEST_SQLITE, files[0])
+                                })
+                                .catch(e => {
+                                    console.log("Error in clearDb", e)
+                                    setErocessError(e.message)
+                                })
+                        }}
+                    />
+                )
+            }
+        </CardView>
+    )
 }
