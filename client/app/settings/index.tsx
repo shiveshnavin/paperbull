@@ -1,3 +1,5 @@
+'use client'
+
 import { BottomSheet, ButtonView, Caption, CardView, Center, CompositeTextInputView, DropDownView, Expand, HBox, KeyboardAvoidingScrollView, LoadingButton, PressableView, ProgressBarView, Spinner, Storage, Subtitle, SwitchView, TextView, ThemeContext, TitleText, TransparentButton, TransparentCenterToolbar, VBox, VPage } from "react-native-boxes";
 import { useStyle } from "../../components/style";
 import React, { useCallback, useContext, useEffect, useState } from "react";
@@ -137,7 +139,7 @@ export function MetaData() {
                             //     }}>
                             // <TitleText style={style.link} >{a}</TitleText>
                             // </PressableView>
-                            <TitleText>{a}</TitleText>
+                            <TitleText key={`${a}-${idx}`}>{a}</TitleText>
                         )
                     })
                 }
@@ -443,6 +445,7 @@ export function LoadSqlite() {
 
 
     useEventListener(Topic.INGEST_SQLITE_ERROR, ({ message }) => {
+        setLoadProgress(-1)
         setErocessError(message)
     })
     useEventListener(Topic.INGEST_SQLITE_PROGRESS, ({ progress, total }) => {

@@ -43,10 +43,23 @@ export default function RootLayout() {
     Storage.getKeyAsync('preferred_resolution').then(r => {
       tickerApi.setResolution(r as Resolution || 'realtime')
     })
-    tickerApi.init().finally(() => {
-      setApiInit(true);
-      // (tickerApi as SqliteTickerApi).test()
-    })
+
+    Storage.getKeyAsync('sqlite_datasets')
+      .then((listStr) => {
+        let list = []
+        if (listStr) {
+          list = JSON.parse(listStr)
+        }
+        tickerApi.init(list)
+          .then(healthyDatasets => {
+            // Storage.setKeyAsync('sqlite_datasets', JSON.stringify(healthyDatasets))
+          })
+          .finally(() => {
+            setApiInit(true);
+            // (tickerApi as SqliteTickerApi).test()
+          })
+      })
+
     ctx.tickApi = tickerApi
     return ctx
   })

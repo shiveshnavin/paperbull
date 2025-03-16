@@ -22,8 +22,15 @@ export type MarketDataRow = {
     time: string
     last_price: number
 }
+
+export type SqliteFileMeta = {
+    file: string
+    size: number,
+    count: number
+    dates: string[]
+}
 export class SqliteTickerApi extends TickerApi {
-    datasets: SQLiteDatabase[] = [];
+    datasets!: (SqliteFileMeta & { db: SQLiteDatabase })[]
     dbCold!: SQLiteDatabase;
     dbHot!: SQLiteDatabase;
 
@@ -31,19 +38,40 @@ export class SqliteTickerApi extends TickerApi {
         super(timeframe)
     }
 
-    async init(dbPath?: string) {
+    async init(datasets?: SqliteFileMeta[]) {
         if (!this.dbCold) {
-            this.dbCold = await SQLite.openDatabaseAsync(dbPath || 'market_data.sqlite');
+            this.dbCold = await SQLite.openDatabaseAsync('market_data.sqlite');
             this.dbHot = await SQLite.openDatabaseAsync('market_data_runtime.sqlite');
             await this.dbCold.execAsync('PRAGMA journal_mode = WAL');
             await this.dbCold.execAsync('PRAGMA foreign_keys = ON');
 
             await this.createCacheTableIfNotExists()
             await this.createFullMktDataTable()
-            await this.createHotMktDataTable()
             await this.createFullMktIndex()
+
+            await this.createHotMktDataTable()
             await this.createHotMktIndex()
         }
+        let healthyDatasets: SqliteFileMeta[] = []
+        if (datasets && !this.datasets) {
+            this.datasets = []
+            for (const ds of datasets) {
+                try {
+                    let info = await FileSystem.getInfoAsync(ds.file);
+                    console.log('info', info);
+                    if (info.exists) {
+                        let db = await SQLite.openDatabaseAsync(ds.file);
+                        this.datasets.push({ ...ds, db });
+                        healthyDatasets.push(ds);
+                    }
+                } catch (e: any) {
+                    console.log('Error loading saved datasets', e.message);
+                }
+            }
+        }
+        console.log('saved dataests', datasets)
+        console.log('healthy dataests', healthyDatasets)
+        return healthyDatasets
     }
 
     async subscribe(
@@ -396,15 +424,24 @@ export class SqliteTickerApi extends TickerApi {
             to: destinationUri,
         });
 
-        this.dbCold = await SQLite.openDatabaseAsync(destinationUri || 'market_data.sqlite');
-        const countQuery = `
-        SELECT COUNT(*) as count 
-        FROM ${TABLE_MARKET_DATA_FULL} 
-      `;
-        const countResult: any[] = await this.dbCold.getAllAsync(countQuery);
+        let ds = {
+            file: destinationUri,
+            size: file.size
+        } as SqliteFileMeta
+        let db = await SQLite.openDatabaseAsync(ds.file)
+        const countQuery = `SELECT COUNT(*) as count FROM ${TABLE_MARKET_DATA_FULL}`;
+        const countResult: any[] = await db.getAllAsync(countQuery);
         let totalRows = countResult[0].count;
         onProgress && onProgress(totalRows, totalRows)
 
+        const dates: any[] = await db.getAllAsync(`
+        SELECT distinct(date) as date 
+        FROM ${TABLE_MARKET_DATA_FULL} `);
+
+        ds.count = totalRows
+        ds.dates = dates.map(d => d.date)
+        this.datasets.push({ ...ds, db })
+        return ds
     }
 
     async test() {
@@ -560,7 +597,7 @@ export class SqliteTickerApi extends TickerApi {
                 time TEXT,
                 last_price REAL
             );
-        `);
+        `)
     }
     private async createCacheTableIfNotExists() {
         await this.dbHot.execAsync(`
@@ -624,17 +661,17 @@ export class SqliteTickerApi extends TickerApi {
     async createHotMktIndex() {
         console.log('Creating hot data index')
         await Promise.all([
-            this.dbCold.execAsync(`
+            this.dbHot.execAsync(`
                 CREATE INDEX IF NOT EXISTS idx_symbol ON ${TABLE_MARKET_DATA_RUNTIME}(symbol);
             `),
 
-            this.dbCold.execAsync(`
+            this.dbHot.execAsync(`
                 CREATE INDEX IF NOT EXISTS idx_symbol_datetime  ON ${TABLE_MARKET_DATA_RUNTIME}(symbol, datetime);
             `),
-            this.dbCold.execAsync(`
+            this.dbHot.execAsync(`
                 CREATE INDEX IF NOT EXISTS idx_symbol_date_and_time  ON ${TABLE_MARKET_DATA_RUNTIME}(symbol, date, time);
             `),
-            this.dbCold.execAsync(`
+            this.dbHot.execAsync(`
                 CREATE INDEX IF NOT EXISTS idx_symbol_date_time_datetime   ON ${TABLE_MARKET_DATA_RUNTIME}(symbol, date, time, datetime);
             `)
         ]).then(() => {

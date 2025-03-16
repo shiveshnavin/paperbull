@@ -2,8 +2,8 @@ import { useCallback, useContext, useEffect, useState } from "react"
 import { PickedFile } from "../components/filepicker/FilePickerProps"
 import { Topic, useEventListener, useEventPublisher } from "../components/store"
 import { AppContext } from "../components/AppContext"
-import { SqliteTickerApi } from "../services/SqliteTickerApi"
-import { BottomSheet } from "react-native-boxes"
+import { SqliteFileMeta, SqliteTickerApi } from "../services/SqliteTickerApi"
+import { BottomSheet, Storage } from "react-native-boxes"
 import { TimeTravel } from "../components/TimeTravel"
 import { Resolution, Snapshot } from "../services/TickerApi"
 import { Tick } from "../services/models/Tick"
@@ -179,8 +179,18 @@ export function EventListeners() {
                     total
                 })
             })
-            .then(() => {
-                tickerApi.getDataSize('2025-03-12', '0915').then(console.log)
+            .then((result: SqliteFileMeta) => {
+                Storage.getKeyAsync('sqlite_datasets')
+                    .then((listStr) => {
+                        let list = []
+                        if (listStr) {
+                            list = JSON.parse(listStr)
+                        }
+                        if (!list.find((d: SqliteFileMeta) => d.file == result.file))
+                            list.push(result)
+                        Storage.setKeyAsync('sqlite_datasets', JSON.stringify(list))
+                        console.log('saved datasets', list)
+                    })
             })
             .catch(e => {
                 // console.log('Error loading CSV', e)
