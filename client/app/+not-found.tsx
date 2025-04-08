@@ -11,7 +11,7 @@ export default function NotFoundScreen() {
         <Title>
           Page not found
         </Title>
-        <Link href="/watchlist" style={styles.link}>
+        <Link href="/home" style={styles.link}>
           <TextView>
             Go back home
           </TextView>
