@@ -14,5 +14,6 @@ A virtual trading app for practicing paper trades, especially in derivative segm
 ```
 
 # Demo
-<img src="https://github.com/user-attachments/assets/822b6ed4-2132-4cf5-9886-707842513714" width="300"/>
+https://github.com/user-attachments/assets/7296c118-5700-403c-ab69-8c5317e28ab2
+
 
